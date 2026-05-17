@@ -1,7 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import type { UseEmblaCarouselType } from 'embla-carousel-react'
 import {
+  BarElement,
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
@@ -12,16 +14,20 @@ import {
   Legend,
   Filler,
 } from 'chart.js'
-import { Line } from 'react-chartjs-2'
+import { Chart } from 'react-chartjs-2'
 import { TrendingUp, TrendingDown, CreditCard, Banknote, Truck, Store as StoreIcon } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel'
 import { useWorkflow } from '@/contexts/workflow-context'
 import { useStore } from '@/store/useStore'
 
+type CarouselApi = UseEmblaCarouselType[1]
+
 ChartJS.register(
+  BarElement,
   CategoryScale,
   LinearScale,
   PointElement,
@@ -32,7 +38,36 @@ ChartJS.register(
   Filler
 )
 
-// Mock 데이터
+// 앱 기준 오늘 날짜 (포트폴리오 mock)
+const TODAY = new Date(2026, 4, 17) // May 17, 2026
+
+// 날짜 기반 결정론적 mock 데이터 생성
+function generateDayData(date: Date) {
+  const dayOfWeek = date.getDay()
+  const dateNum = date.getDate()
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+  const seed = (dateNum * 137 + dayOfWeek * 41) % 100
+  const baseTotal = Math.round((16000 + seed * 80) * (isWeekend ? 1.3 : 1.0))
+
+  return {
+    instore: { value: Math.round(baseTotal * 0.45), change: parseFloat(((seed % 25 - 10) / 2).toFixed(1)) },
+    card: { value: Math.round(baseTotal * 0.35), change: parseFloat(((seed % 30 - 8) / 2).toFixed(1)) },
+    cash: { value: Math.round(baseTotal * 0.15), change: parseFloat(((seed % 20 - 12) / 2).toFixed(1)) },
+    delivery: { value: Math.round(baseTotal * 0.20), change: parseFloat(((seed % 35 - 5) / 2).toFixed(1)) },
+    total: baseTotal,
+  }
+}
+
+function formatDate(date: Date) {
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+// Mock 차트 데이터 (기존 유지)
 const mockSalesData = {
   daily: {
     labels: ['월', '화', '수', '목', '금', '토', '일'],
@@ -46,15 +81,6 @@ const mockSalesData = {
     labels: ['1월', '2월', '3월', '4월', '5월', '6월'],
     data: [72000, 68000, 75000, 82000, 78000, 85000],
   },
-}
-
-const mockBreakdown = {
-  instore: 45,
-  card: 35,
-  cash: 15,
-  uberEats: 12,
-  doorDash: 8,
-  cashAndCarry: 5,
 }
 
 interface SalesCardProps {
@@ -85,29 +111,89 @@ function SalesCard({ title, value, change, icon: Icon }: SalesCardProps) {
 }
 
 export function SalesSummary() {
-  const { showGrossSales, toggleSalesMode, selectedPeriod, setSelectedPeriod } = useWorkflow()
+  const { showGrossSales, toggleSalesMode, selectedPeriod, setSelectedPeriod, dailySalesFormData } = useWorkflow()
   const { selectedStoreId } = useStore()
+
+  // 오늘 매출 입력 여부 확인
+  const hasTodaySales =
+    dailySalesFormData.date !== null &&
+    new Date(dailySalesFormData.date).toDateString() === TODAY.toDateString()
+
+  // 슬라이드 목록 생성: 7일 전 ~ 최근 접근 가능한 날짜
+  const slides = useMemo(() => {
+    const maxOffset = hasTodaySales ? 0 : 1 // 0=오늘, 1=어제
+    const result = []
+    for (let i = 7; i >= maxOffset; i--) {
+      const date = new Date(TODAY)
+      date.setDate(TODAY.getDate() - i)
+      result.push({ date, data: generateDayData(date) })
+    }
+    return result
+  }, [hasTodaySales])
+
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>()
+  const [currentIndex, setCurrentIndex] = useState(slides.length - 1)
+
+  // API 연결 후 선택 이벤트 구독
+  useEffect(() => {
+    if (!carouselApi) return
+    const onSelect = () => setCurrentIndex(carouselApi.selectedScrollSnap())
+    carouselApi.on('select', onSelect)
+    return () => { carouselApi.off('select', onSelect) }
+  }, [carouselApi])
+
+  // hasTodaySales 변경 시 마지막 슬라이드로 리셋
+  useEffect(() => {
+    setCurrentIndex(slides.length - 1)
+    carouselApi?.scrollTo(slides.length - 1, true)
+  }, [hasTodaySales, slides.length, carouselApi])
+
+  const currentSlide = slides[currentIndex] ?? slides[slides.length - 1]
+  const dayData = currentSlide.data
+  const displayTotal = showGrossSales ? dayData.total : Math.round(dayData.total * 0.85)
+  const selectedPeriodLabel = selectedPeriod === 'daily' ? '일별' : selectedPeriod === 'weekly' ? '주별' : '월별'
 
   const chartData = useMemo(() => {
     const periodData = mockSalesData[selectedPeriod]
+    const values = showGrossSales ? periodData.data : periodData.data.map((v) => v * 0.85)
     return {
       labels: periodData.labels,
       datasets: [
         {
+          type: 'bar' as const,
+          label: showGrossSales ? '매출 막대' : '순매출 막대',
+          data: values,
+          backgroundColor: 'oklch(0.527 0.154 150.069 / 0.18)',
+          borderColor: 'oklch(0.527 0.154 150.069 / 0.35)',
+          borderRadius: 10,
+          borderSkipped: false,
+          maxBarThickness: 42,
+        },
+        {
+          type: 'line' as const,
           label: showGrossSales ? '총매출 (Gross)' : '순매출 (Net)',
-          data: showGrossSales ? periodData.data : periodData.data.map((v) => v * 0.85),
+          data: values,
           borderColor: 'oklch(0.527 0.154 150.069)',
-          backgroundColor: 'oklch(0.527 0.154 150.069 / 0.1)',
-          fill: true,
+          backgroundColor: 'oklch(0.527 0.154 150.069 / 0.22)',
+          fill: false,
           tension: 0.4,
           pointBackgroundColor: 'oklch(0.527 0.154 150.069)',
           pointBorderColor: '#fff',
           pointBorderWidth: 2,
           pointRadius: 4,
           pointHoverRadius: 6,
+          pointHoverBorderWidth: 2,
+          borderWidth: 3,
+          order: 0,
         },
       ],
     }
+  }, [selectedPeriod, showGrossSales])
+
+  const chartPeriodTotal = useMemo(() => {
+    const periodData = mockSalesData[selectedPeriod]
+    const values = showGrossSales ? periodData.data : periodData.data.map((v) => v * 0.85)
+    return values.reduce((sum, value) => sum + value, 0)
   }, [selectedPeriod, showGrossSales])
 
   const chartOptions = {
@@ -122,7 +208,7 @@ export function SalesSummary() {
         titleColor: '#fff',
         bodyColor: '#fff',
         padding: 12,
-        displayColors: false,
+        displayColors: true,
         callbacks: {
           label: (context: { parsed: { y: number } }) => `$${context.parsed.y.toLocaleString()}`,
         },
@@ -130,17 +216,11 @@ export function SalesSummary() {
     },
     scales: {
       x: {
-        grid: {
-          display: false,
-        },
-        ticks: {
-          color: 'oklch(0.556 0 0)',
-        },
+        grid: { display: false },
+        ticks: { color: 'oklch(0.556 0 0)' },
       },
       y: {
-        grid: {
-          color: 'oklch(0.922 0 0)',
-        },
+        grid: { color: 'oklch(0.922 0 0)' },
         ticks: {
           color: 'oklch(0.556 0 0)',
           callback: (value: number | string) => `$${Number(value).toLocaleString()}`,
@@ -149,16 +229,19 @@ export function SalesSummary() {
     },
   }
 
-  const totalSales = mockSalesData[selectedPeriod].data.reduce((a, b) => a + b, 0)
-  const displayTotal = showGrossSales ? totalSales : totalSales * 0.85
-
   return (
     <section id="sales" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">매출 요약</h2>
           <p className="text-muted-foreground">
-            {selectedStoreId === 'all' ? '전체 지점' : STORES.find(s => s.id === selectedStoreId)?.name} 매출 현황
+            Total{' '}
+            <span className="text-xl font-bold text-foreground">
+              ${displayTotal.toLocaleString()}
+            </span>
+          </p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {formatDate(currentSlide.date)}
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -175,32 +258,50 @@ export function SalesSummary() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SalesCard
-          title="매장 방문"
-          value={`$${(displayTotal * mockBreakdown.instore / 100).toLocaleString()}`}
-          change={8.2}
-          icon={StoreIcon}
-        />
-        <SalesCard
-          title="카드 결제"
-          value={`$${(displayTotal * mockBreakdown.card / 100).toLocaleString()}`}
-          change={12.5}
-          icon={CreditCard}
-        />
-        <SalesCard
-          title="현금 결제"
-          value={`$${(displayTotal * mockBreakdown.cash / 100).toLocaleString()}`}
-          change={-3.1}
-          icon={Banknote}
-        />
-        <SalesCard
-          title="배달앱 (Uber+DoorDash)"
-          value={`$${(displayTotal * (mockBreakdown.uberEats + mockBreakdown.doorDash) / 100).toLocaleString()}`}
-          change={15.8}
-          icon={Truck}
-        />
+      {/* Summary Cards Carousel */}
+      <div className="relative px-10">
+        <Carousel
+          setApi={setCarouselApi}
+          opts={{ startIndex: slides.length - 1 }}
+        >
+          <CarouselContent>
+            {slides.map(({ date, data }) => {
+              const slideTotal = showGrossSales ? data.total : Math.round(data.total * 0.85)
+              return (
+                <CarouselItem key={date.toISOString()}>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <SalesCard
+                      title="매장 방문"
+                      value={`$${Math.round(slideTotal * 0.45).toLocaleString()}`}
+                      change={data.instore.change}
+                      icon={StoreIcon}
+                    />
+                    <SalesCard
+                      title="카드 결제"
+                      value={`$${Math.round(slideTotal * 0.35).toLocaleString()}`}
+                      change={data.card.change}
+                      icon={CreditCard}
+                    />
+                    <SalesCard
+                      title="현금 결제"
+                      value={`$${Math.round(slideTotal * 0.15).toLocaleString()}`}
+                      change={data.cash.change}
+                      icon={Banknote}
+                    />
+                    <SalesCard
+                      title="배달앱 (Uber+DoorDash)"
+                      value={`$${Math.round(slideTotal * 0.20).toLocaleString()}`}
+                      change={data.delivery.change}
+                      icon={Truck}
+                    />
+                  </div>
+                </CarouselItem>
+              )
+            })}
+          </CarouselContent>
+          <CarouselPrevious className="-left-10" />
+          <CarouselNext className="-right-10" />
+        </Carousel>
       </div>
 
       {/* Chart Section */}
@@ -210,7 +311,9 @@ export function SalesSummary() {
             <div>
               <CardTitle>매출 추이</CardTitle>
               <CardDescription>
-                기간별 매출 변동 그래프
+                <span className="font-medium text-foreground">
+                  {selectedPeriodLabel} 누적 Total ${Math.round(chartPeriodTotal).toLocaleString()}
+                </span>
               </CardDescription>
             </div>
             <Tabs value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as 'daily' | 'weekly' | 'monthly')}>
@@ -224,7 +327,7 @@ export function SalesSummary() {
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
-            <Line data={chartData} options={chartOptions as object} />
+            <Chart type="bar" data={chartData} options={chartOptions as object} />
           </div>
         </CardContent>
       </Card>
@@ -232,8 +335,3 @@ export function SalesSummary() {
   )
 }
 
-const STORES = [
-  { id: 'all', name: '전체 보기' },
-  { id: 'kibo-north', name: 'Kibo Sushi North' },
-  { id: 'kibo-south', name: 'Kibo Sushi South' },
-]

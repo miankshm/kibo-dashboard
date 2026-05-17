@@ -12,7 +12,7 @@ export function PageContainer({ children, className }: PageContainerProps) {
   return (
     <main
       className={cn(
-        'min-h-[calc(100vh-4rem)] w-full lg:pl-64',
+        'min-h-[calc(100vh-4rem)] w-full',
         className
       )}
     >
