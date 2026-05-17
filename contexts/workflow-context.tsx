@@ -14,6 +14,10 @@ export interface DailySalesFormData {
   actualClosingCash: number
 }
 
+export interface DailySalesEntry extends DailySalesFormData {
+  id: string
+}
+
 // AI 분석 상태
 export interface AIAnalysisState {
   isLoading: boolean
@@ -45,6 +49,8 @@ interface WorkflowContextType {
   dailySalesFormData: DailySalesFormData
   setDailySalesFormData: (data: Partial<DailySalesFormData>) => void
   resetDailySalesFormData: () => void
+  dailySalesEntries: DailySalesEntry[]
+  recordDailySalesEntry: (data: DailySalesFormData) => void
 
   // AI 분석 상태
   aiAnalysis: AIAnalysisState
@@ -97,6 +103,7 @@ const WorkflowContext = createContext<WorkflowContextType | undefined>(undefined
 export function WorkflowProvider({ children }: { children: ReactNode }) {
   const [drawerState, setDrawerState] = useState<DrawerState>(initialDrawerState)
   const [dailySalesFormData, setDailySalesFormDataState] = useState<DailySalesFormData>(initialDailySalesFormData)
+  const [dailySalesEntries, setDailySalesEntries] = useState<DailySalesEntry[]>([])
   const [aiAnalysis, setAIAnalysis] = useState<AIAnalysisState>(initialAIAnalysis)
   const [loadingState, setLoadingStateInternal] = useState<LoadingState>(initialLoadingState)
   const [showGrossSales, setShowGrossSales] = useState(true)
@@ -120,6 +127,19 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
 
   const resetDailySalesFormData = useCallback(() => {
     setDailySalesFormDataState(initialDailySalesFormData)
+  }, [])
+
+  const recordDailySalesEntry = useCallback((data: DailySalesFormData) => {
+    if (!data.date) return
+
+    const entryId = data.date.toISOString().split('T')[0]
+
+    setDailySalesEntries((prev) => {
+      const filtered = prev.filter((entry) => entry.id !== entryId)
+      return [...filtered, { ...data, id: entryId }].sort(
+        (left, right) => left.date!.getTime() - right.date!.getTime()
+      )
+    })
   }, [])
 
   const generateAIReport = useCallback(async () => {
@@ -174,6 +194,8 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
         dailySalesFormData,
         setDailySalesFormData,
         resetDailySalesFormData,
+        dailySalesEntries,
+        recordDailySalesEntry,
         aiAnalysis,
         generateAIReport,
         clearAIReport,

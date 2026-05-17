@@ -48,7 +48,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>
 
 export function DailySalesForm() {
-  const { drawerState, closeDrawer, resetDailySalesFormData } = useWorkflow()
+  const { drawerState, closeDrawer, resetDailySalesFormData, recordDailySalesEntry } = useWorkflow()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<FormValues>({
@@ -69,6 +69,7 @@ export function DailySalesForm() {
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1500))
     console.log('일일 매출 데이터 제출:', data)
+    recordDailySalesEntry(data)
     setIsSubmitting(false)
     form.reset()
     resetDailySalesFormData()
