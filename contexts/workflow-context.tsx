@@ -1,9 +1,11 @@
 'use client'
 
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import type { StoreId } from '@/store/useStore'
 
 // 데이터 입력 폼 상태
 export interface DailySalesFormData {
+  storeId: StoreId | null
   date: Date | null
   cardSales: number
   cashSales: number
@@ -16,6 +18,7 @@ export interface DailySalesFormData {
 
 export interface DailySalesEntry extends DailySalesFormData {
   id: string
+  storeId: StoreId
 }
 
 // AI 분석 상태
@@ -50,7 +53,7 @@ interface WorkflowContextType {
   setDailySalesFormData: (data: Partial<DailySalesFormData>) => void
   resetDailySalesFormData: () => void
   dailySalesEntries: DailySalesEntry[]
-  recordDailySalesEntry: (data: DailySalesFormData) => void
+  recordDailySalesEntry: (data: DailySalesFormData & { storeId: StoreId }) => void
 
   // AI 분석 상태
   aiAnalysis: AIAnalysisState
@@ -71,6 +74,7 @@ interface WorkflowContextType {
 }
 
 const initialDailySalesFormData: DailySalesFormData = {
+  storeId: null,
   date: null,
   cardSales: 0,
   cashSales: 0,
@@ -129,10 +133,11 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
     setDailySalesFormDataState(initialDailySalesFormData)
   }, [])
 
-  const recordDailySalesEntry = useCallback((data: DailySalesFormData) => {
+  const recordDailySalesEntry = useCallback((data: DailySalesFormData & { storeId: StoreId }) => {
     if (!data.date) return
 
-    const entryId = data.date.toISOString().split('T')[0]
+    const entryDate = data.date.toISOString().split('T')[0]
+    const entryId = `${data.storeId}-${entryDate}`
 
     setDailySalesEntries((prev) => {
       const filtered = prev.filter((entry) => entry.id !== entryId)

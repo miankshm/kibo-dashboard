@@ -42,12 +42,14 @@ ChartJS.register(
 const TODAY = new Date(2026, 4, 17) // May 17, 2026
 
 // 날짜 기반 결정론적 mock 데이터 생성
-function generateDayData(date: Date) {
+function generateDayData(date: Date, storeId: 'kibo-north' | 'kibo-south') {
   const dayOfWeek = date.getDay()
   const dateNum = date.getDate()
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-  const seed = (dateNum * 137 + dayOfWeek * 41) % 100
-  const baseTotal = Math.round((16000 + seed * 80) * (isWeekend ? 1.3 : 1.0))
+  const storeSeed = storeId === 'kibo-north' ? 17 : 31
+  const storeFactor = storeId === 'kibo-north' ? 1.06 : 0.92
+  const seed = (dateNum * 137 + dayOfWeek * 41 + storeSeed) % 100
+  const baseTotal = Math.round((16000 + seed * 80) * (isWeekend ? 1.3 : 1.0) * storeFactor)
 
   return {
     instore: { value: Math.round(baseTotal * 0.45), change: parseFloat(((seed % 25 - 10) / 2).toFixed(1)) },
@@ -55,6 +57,31 @@ function generateDayData(date: Date) {
     cash: { value: Math.round(baseTotal * 0.15), change: parseFloat(((seed % 20 - 12) / 2).toFixed(1)) },
     delivery: { value: Math.round(baseTotal * 0.20), change: parseFloat(((seed % 35 - 5) / 2).toFixed(1)) },
     total: baseTotal,
+  }
+}
+
+function combineDayData(
+  northData: ReturnType<typeof generateDayData>,
+  southData: ReturnType<typeof generateDayData>
+) {
+  return {
+    instore: {
+      value: northData.instore.value + southData.instore.value,
+      change: parseFloat(((northData.instore.change + southData.instore.change) / 2).toFixed(1)),
+    },
+    card: {
+      value: northData.card.value + southData.card.value,
+      change: parseFloat(((northData.card.change + southData.card.change) / 2).toFixed(1)),
+    },
+    cash: {
+      value: northData.cash.value + southData.cash.value,
+      change: parseFloat(((northData.cash.change + southData.cash.change) / 2).toFixed(1)),
+    },
+    delivery: {
+      value: northData.delivery.value + southData.delivery.value,
+      change: parseFloat(((northData.delivery.change + southData.delivery.change) / 2).toFixed(1)),
+    },
+    total: northData.total + southData.total,
   }
 }
 
@@ -113,23 +140,42 @@ function SalesCard({ title, value, change, icon: Icon }: SalesCardProps) {
 export function SalesSummary() {
   const { showGrossSales, toggleSalesMode, selectedPeriod, setSelectedPeriod, dailySalesFormData } = useWorkflow()
   const { selectedStoreId } = useStore()
+  const { dailySalesEntries } = useWorkflow()
+
+  const filteredEntries = useMemo(() => {
+    if (selectedStoreId === 'all') return dailySalesEntries
+    return dailySalesEntries.filter((entry) => entry.storeId === selectedStoreId)
+  }, [dailySalesEntries, selectedStoreId])
 
   // 오늘 매출 입력 여부 확인
   const hasTodaySales =
-    dailySalesFormData.date !== null &&
-    new Date(dailySalesFormData.date).toDateString() === TODAY.toDateString()
+    filteredEntries.some((entry) => entry.date && new Date(entry.date).toDateString() === TODAY.toDateString()) ||
+    (selectedStoreId !== 'all' &&
+      dailySalesFormData.date !== null &&
+      new Date(dailySalesFormData.date).toDateString() === TODAY.toDateString() &&
+      dailySalesFormData.storeId === selectedStoreId)
 
   // 슬라이드 목록 생성: 7일 전 ~ 최근 접근 가능한 날짜
   const slides = useMemo(() => {
     const maxOffset = hasTodaySales ? 0 : 1 // 0=오늘, 1=어제
     const result = []
+
+    const getScopedDayData = (date: Date) => {
+      if (selectedStoreId === 'all') {
+        const north = generateDayData(date, 'kibo-north')
+        const south = generateDayData(date, 'kibo-south')
+        return combineDayData(north, south)
+      }
+      return generateDayData(date, selectedStoreId)
+    }
+
     for (let i = 7; i >= maxOffset; i--) {
       const date = new Date(TODAY)
       date.setDate(TODAY.getDate() - i)
-      result.push({ date, data: generateDayData(date) })
+      result.push({ date, data: getScopedDayData(date) })
     }
     return result
-  }, [hasTodaySales])
+  }, [hasTodaySales, selectedStoreId])
 
   const [carouselApi, setCarouselApi] = useState<CarouselApi>()
   const [currentIndex, setCurrentIndex] = useState(slides.length - 1)
@@ -155,7 +201,9 @@ export function SalesSummary() {
 
   const chartData = useMemo(() => {
     const periodData = mockSalesData[selectedPeriod]
-    const values = showGrossSales ? periodData.data : periodData.data.map((v) => v * 0.85)
+    const scopedFactor = selectedStoreId === 'all' ? 2.0 : selectedStoreId === 'kibo-north' ? 1.06 : 0.94
+    const scopedValues = periodData.data.map((v) => Math.round(v * scopedFactor))
+    const values = showGrossSales ? scopedValues : scopedValues.map((v) => v * 0.85)
     return {
       labels: periodData.labels,
       datasets: [
@@ -188,13 +236,15 @@ export function SalesSummary() {
         },
       ],
     }
-  }, [selectedPeriod, showGrossSales])
+  }, [selectedPeriod, showGrossSales, selectedStoreId])
 
   const chartPeriodTotal = useMemo(() => {
     const periodData = mockSalesData[selectedPeriod]
-    const values = showGrossSales ? periodData.data : periodData.data.map((v) => v * 0.85)
+    const scopedFactor = selectedStoreId === 'all' ? 2.0 : selectedStoreId === 'kibo-north' ? 1.06 : 0.94
+    const scopedValues = periodData.data.map((v) => Math.round(v * scopedFactor))
+    const values = showGrossSales ? scopedValues : scopedValues.map((v) => v * 0.85)
     return values.reduce((sum, value) => sum + value, 0)
-  }, [selectedPeriod, showGrossSales])
+  }, [selectedPeriod, showGrossSales, selectedStoreId])
 
   const chartOptions = {
     responsive: true,

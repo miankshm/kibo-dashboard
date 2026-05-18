@@ -30,9 +30,18 @@ import { Separator } from '@/components/ui/separator'
 import { useWorkflow } from '@/contexts/workflow-context'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
+import { useStore, STORES, type StoreId } from '@/store/useStore'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 // Zod 스키마 - Light validation
 const formSchema = z.object({
+  storeId: z.enum(['kibo-north', 'kibo-south']).optional(),
   date: z.date({
     required_error: '날짜를 선택해주세요.',
   }),
@@ -49,7 +58,9 @@ type FormValues = z.infer<typeof formSchema>
 
 export function DailySalesForm() {
   const { drawerState, closeDrawer, resetDailySalesFormData, recordDailySalesEntry } = useWorkflow()
+  const { selectedStoreId } = useStore()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const selectedStore = STORES.find((store) => store.id === selectedStoreId)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -65,11 +76,19 @@ export function DailySalesForm() {
   })
 
   const onSubmit = async (data: FormValues) => {
+    const resolvedStoreId: StoreId | null =
+      selectedStoreId === 'all' ? (data.storeId ?? null) : selectedStoreId
+
+    if (!resolvedStoreId) {
+      form.setError('storeId', { message: '지점을 선택해주세요.' })
+      return
+    }
+
     setIsSubmitting(true)
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1500))
-    console.log('일일 매출 데이터 제출:', data)
-    recordDailySalesEntry(data)
+    console.log('일일 매출 데이터 제출:', { ...data, storeId: resolvedStoreId })
+    recordDailySalesEntry({ ...data, storeId: resolvedStoreId })
     setIsSubmitting(false)
     form.reset()
     resetDailySalesFormData()
@@ -102,6 +121,41 @@ export function DailySalesForm() {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-6">
+            {selectedStoreId === 'all' ? (
+              <FormField
+                control={form.control}
+                name="storeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>지점 선택</FormLabel>
+                    <Select value={field.value} onValueChange={(value) => field.onChange(value as StoreId)}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="저장할 지점을 선택하세요" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {STORES.filter((store) => store.id !== 'all').map((store) => (
+                          <SelectItem key={store.id} value={store.id}>
+                            {store.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : (
+              <FormItem>
+                <FormLabel>지점 선택</FormLabel>
+                <FormControl>
+                  <Input value={selectedStore?.name ?? ''} readOnly />
+                </FormControl>
+                <FormDescription>현재 헤더에서 선택된 지점으로 저장됩니다.</FormDescription>
+              </FormItem>
+            )}
+
             {/* 기준일 */}
             <FormField
               control={form.control}

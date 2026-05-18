@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel'
 import { useWorkflow } from '@/contexts/workflow-context'
+import { useStore } from '@/store/useStore'
 
 type CarouselApi = UseEmblaCarouselType[1]
 
@@ -65,11 +66,14 @@ function formatRange(start: Date, end: Date) {
   return `${startLabel} - ${endLabel}`
 }
 
-function generateSampleEntries(endDate: Date): CashFlowEntry[] {
+function generateSampleEntries(endDate: Date, scope: 'all' | 'kibo-north' | 'kibo-south'): CashFlowEntry[] {
+  const factor = scope === 'all' ? 2.0 : scope === 'kibo-north' ? 1.08 : 0.92
+  const seedOffset = scope === 'all' ? 23 : scope === 'kibo-north' ? 11 : 37
+
   return Array.from({ length: PERIOD_LENGTH_DAYS }, (_, index) => {
     const date = addDays(endDate, -(PERIOD_LENGTH_DAYS - 1 - index))
-    const daySeed = date.getDate() * 37 + date.getMonth() * 19 + date.getDay() * 11
-    const expected = 900 + (daySeed % 850)
+    const daySeed = date.getDate() * 37 + date.getMonth() * 19 + date.getDay() * 11 + seedOffset
+    const expected = Math.round((900 + (daySeed % 850)) * factor)
     const actual = expected + ((daySeed % 9) - 4) * 15
 
     return {
@@ -82,25 +86,31 @@ function generateSampleEntries(endDate: Date): CashFlowEntry[] {
 
 export function CashFlowAnalysis() {
   const { dailySalesEntries } = useWorkflow()
+  const { selectedStoreId } = useStore()
   const [carouselApi, setCarouselApi] = useState<CarouselApi>()
   const [currentIndex, setCurrentIndex] = useState(0)
 
+  const scopedEntries = useMemo(() => {
+    if (selectedStoreId === 'all') return dailySalesEntries
+    return dailySalesEntries.filter((entry) => entry.storeId === selectedStoreId)
+  }, [dailySalesEntries, selectedStoreId])
+
   const anchorDate = useMemo(() => {
-    if (dailySalesEntries.length === 0) {
+    if (scopedEntries.length === 0) {
       return startOfDay(DEFAULT_REFERENCE_DATE)
     }
 
-    return dailySalesEntries.reduce((latest, entry) => {
+    return scopedEntries.reduce((latest, entry) => {
       if (!entry.date) return latest
       return entry.date > latest ? entry.date : latest
-    }, startOfDay(dailySalesEntries[0].date ?? DEFAULT_REFERENCE_DATE))
-  }, [dailySalesEntries])
+    }, startOfDay(scopedEntries[0].date ?? DEFAULT_REFERENCE_DATE))
+  }, [scopedEntries])
 
   const cashFlowEntries = useMemo(() => {
-    const sampleEntries = generateSampleEntries(anchorDate)
+    const sampleEntries = generateSampleEntries(anchorDate, selectedStoreId)
     const entryMap = new Map(sampleEntries.map((entry) => [getDateKey(entry.date), entry]))
 
-    dailySalesEntries.forEach((entry) => {
+    scopedEntries.forEach((entry) => {
       if (!entry.date) return
       entryMap.set(getDateKey(entry.date), {
         date: startOfDay(entry.date),
@@ -110,7 +120,7 @@ export function CashFlowAnalysis() {
     })
 
     return Array.from(entryMap.values()).sort((left, right) => left.date.getTime() - right.date.getTime())
-  }, [anchorDate, dailySalesEntries])
+  }, [anchorDate, scopedEntries, selectedStoreId])
 
   const periods = useMemo(() => {
     return Array.from({ length: PERIOD_COUNT }, (_, index) => {
