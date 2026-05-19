@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
-import { ko } from 'date-fns/locale'
+import { enUS, ko } from 'date-fns/locale'
 import { CalendarIcon, Loader2, Save } from 'lucide-react'
 import {
   Sheet,
@@ -30,7 +30,8 @@ import { Separator } from '@/components/ui/separator'
 import { useWorkflow } from '@/contexts/workflow-context'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
-import { useStore, STORES, type StoreId } from '@/store/useStore'
+import { useStore, STORES, type StoreId, type Language } from '@/store/useStore'
+import { getTranslation } from '@/lib/i18n'
 import {
   Select,
   SelectContent,
@@ -39,28 +40,34 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-// Zod 스키마 - Light validation
-const formSchema = z.object({
-  storeId: z.enum(['kibo-north', 'kibo-south']).optional(),
-  date: z.date({
-    required_error: '날짜를 선택해주세요.',
-  }),
-  cardSales: z.number().min(0, '0 이상의 금액을 입력해주세요.'),
-  cashSales: z.number().min(0, '0 이상의 금액을 입력해주세요.'),
-  uberEatsSales: z.number().min(0, '0 이상의 금액을 입력해주세요.'),
-  doorDashSales: z.number().min(0, '0 이상의 금액을 입력해주세요.'),
-  cashAndCarrySales: z.number().min(0, '0 이상의 금액을 입력해주세요.'),
-  tips: z.number().min(0, '0 이상의 금액을 입력해주세요.'),
-  actualClosingCash: z.number().min(0, '0 이상의 금액을 입력해주세요.'),
-})
+const createFormSchema = (language: Language) => {
+  const text = getTranslation(language)
 
-type FormValues = z.infer<typeof formSchema>
+  return z.object({
+    storeId: z.enum(['kibo-north', 'kibo-south']).optional(),
+    date: z.date({
+      required_error: text.dailySalesForm.selectDateError,
+    }),
+    cardSales: z.number().min(0, text.dailySalesForm.nonNegativeError),
+    cashSales: z.number().min(0, text.dailySalesForm.nonNegativeError),
+    uberEatsSales: z.number().min(0, text.dailySalesForm.nonNegativeError),
+    doorDashSales: z.number().min(0, text.dailySalesForm.nonNegativeError),
+    cashAndCarrySales: z.number().min(0, text.dailySalesForm.nonNegativeError),
+    tips: z.number().min(0, text.dailySalesForm.nonNegativeError),
+    actualClosingCash: z.number().min(0, text.dailySalesForm.nonNegativeError),
+  })
+}
+
+type FormValues = z.infer<ReturnType<typeof createFormSchema>>
 
 export function DailySalesForm() {
   const { drawerState, closeDrawer, resetDailySalesFormData, recordDailySalesEntry } = useWorkflow()
-  const { selectedStoreId } = useStore()
+  const { selectedStoreId, language } = useStore()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const text = getTranslation(language)
+  const dateLocale = language === 'ko' ? ko : enUS
   const selectedStore = STORES.find((store) => store.id === selectedStoreId)
+  const formSchema = createFormSchema(language)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -80,14 +87,14 @@ export function DailySalesForm() {
       selectedStoreId === 'all' ? (data.storeId ?? null) : selectedStoreId
 
     if (!resolvedStoreId) {
-      form.setError('storeId', { message: '지점을 선택해주세요.' })
+      form.setError('storeId', { message: text.dailySalesForm.selectStoreError })
       return
     }
 
     setIsSubmitting(true)
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1500))
-    console.log('일일 매출 데이터 제출:', { ...data, storeId: resolvedStoreId })
+    console.log('Daily sales data submitted:', { ...data, storeId: resolvedStoreId })
     recordDailySalesEntry({ ...data, storeId: resolvedStoreId })
     setIsSubmitting(false)
     form.reset()
@@ -113,10 +120,8 @@ export function DailySalesForm() {
     <Sheet open={drawerState.dailySalesForm} onOpenChange={handleClose}>
       <SheetContent className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>일일 매출 입력</SheetTitle>
-          <SheetDescription>
-            오늘의 매출 데이터를 입력해주세요. 모든 금액은 달러($) 단위입니다.
-          </SheetDescription>
+          <SheetTitle>{text.dailySalesForm.title}</SheetTitle>
+          <SheetDescription>{text.dailySalesForm.description}</SheetDescription>
         </SheetHeader>
 
         <Form {...form}>
@@ -127,17 +132,17 @@ export function DailySalesForm() {
                 name="storeId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>지점 선택</FormLabel>
+                    <FormLabel>{text.dailySalesForm.storeLabel}</FormLabel>
                     <Select value={field.value} onValueChange={(value) => field.onChange(value as StoreId)}>
                       <FormControl>
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="저장할 지점을 선택하세요" />
+                          <SelectValue placeholder={text.dailySalesForm.storePlaceholder} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {STORES.filter((store) => store.id !== 'all').map((store) => (
                           <SelectItem key={store.id} value={store.id}>
-                            {store.name}
+                            {store.name[language]}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -148,11 +153,11 @@ export function DailySalesForm() {
               />
             ) : (
               <FormItem>
-                <FormLabel>지점 선택</FormLabel>
+                <FormLabel>{text.dailySalesForm.storeLabel}</FormLabel>
                 <FormControl>
-                  <Input value={selectedStore?.name ?? ''} readOnly />
+                  <Input value={selectedStore?.name[language] ?? ''} readOnly />
                 </FormControl>
-                <FormDescription>현재 헤더에서 선택된 지점으로 저장됩니다.</FormDescription>
+                <FormDescription>{text.dailySalesForm.storeLockedDescription}</FormDescription>
               </FormItem>
             )}
 
@@ -162,7 +167,7 @@ export function DailySalesForm() {
               name="date"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>기준일</FormLabel>
+                  <FormLabel>{text.dailySalesForm.dateLabel}</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -174,9 +179,9 @@ export function DailySalesForm() {
                           )}
                         >
                           {field.value ? (
-                            format(field.value, 'PPP', { locale: ko })
+                            format(field.value, 'PPP', { locale: dateLocale })
                           ) : (
-                            <span>날짜 선택</span>
+                            <span>{text.dailySalesForm.datePlaceholder}</span>
                           )}
                           <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                         </Button>
@@ -203,14 +208,14 @@ export function DailySalesForm() {
 
             {/* 결제 수단별 매출 */}
             <div className="space-y-4">
-              <h4 className="text-sm font-medium">결제 수단별 매출</h4>
+              <h4 className="text-sm font-medium">{text.dailySalesForm.paymentTitle}</h4>
 
               <FormField
                 control={form.control}
                 name="cardSales"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>카드 결제 (Card)</FormLabel>
+                    <FormLabel>Card</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -229,7 +234,7 @@ export function DailySalesForm() {
                 name="cashSales"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>현금 결제 (Cash)</FormLabel>
+                    <FormLabel>Cash</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -248,7 +253,7 @@ export function DailySalesForm() {
 
             {/* 배달앱 매출 */}
             <div className="space-y-4">
-              <h4 className="text-sm font-medium">배달앱 매출</h4>
+              <h4 className="text-sm font-medium">{text.dailySalesForm.deliveryTitle}</h4>
 
               <FormField
                 control={form.control}
@@ -274,7 +279,7 @@ export function DailySalesForm() {
                 name="doorDashSales"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Door Dash</FormLabel>
+                    <FormLabel>DoorDash</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -312,14 +317,14 @@ export function DailySalesForm() {
 
             {/* 기타 */}
             <div className="space-y-4">
-              <h4 className="text-sm font-medium">기타</h4>
+              <h4 className="text-sm font-medium">{text.dailySalesForm.otherTitle}</h4>
 
               <FormField
                 control={form.control}
                 name="tips"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>팁 (Tips)</FormLabel>
+                    <FormLabel>{text.dailySalesForm.tips}</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -338,7 +343,7 @@ export function DailySalesForm() {
                 name="actualClosingCash"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>실제 마감 현금</FormLabel>
+                    <FormLabel>{text.dailySalesForm.actualCash}</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -347,9 +352,7 @@ export function DailySalesForm() {
                         onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                       />
                     </FormControl>
-                    <FormDescription>
-                      마감 시 금고에 있는 실제 현금액
-                    </FormDescription>
+                    <FormDescription>{text.dailySalesForm.actualCashDescription}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -359,7 +362,7 @@ export function DailySalesForm() {
             {/* 총 매출 요약 */}
             <div className="rounded-lg bg-muted p-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">총 매출</span>
+                <span className="text-sm font-medium">{text.dailySalesForm.totalSales}</span>
                 <span className="text-lg font-bold text-primary">
                   ${totalSales.toLocaleString()}
                 </span>
@@ -371,12 +374,12 @@ export function DailySalesForm() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  저장 중...
+                  {text.dailySalesForm.saving}
                 </>
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  저장하기
+                  {text.dailySalesForm.save}
                 </>
               )}
             </Button>

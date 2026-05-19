@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { WorkflowProvider } from '@/contexts/workflow-context'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
+import { LanguageSync } from '@/components/providers/LanguageSync'
 import './globals.css'
 
 const geistSans = Geist({
@@ -16,8 +17,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Kibo Dashboard - 통합 매출 관리',
-  description: 'Kibo Sushi 2개 지점의 통합 매출 관리 대시보드',
+  title: 'Kibo Dashboard - 통합 매출 관리 | Sales Operations',
+  description: 'Kibo Sushi 2개 지점의 통합 매출 관리 대시보드 / Unified sales dashboard for two Kibo Sushi locations',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -59,6 +60,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
         <ThemeProvider>
           <WorkflowProvider>
+            <LanguageSync />
             {children}
           </WorkflowProvider>
         </ThemeProvider>

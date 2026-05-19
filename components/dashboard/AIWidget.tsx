@@ -13,10 +13,15 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { useWorkflow } from '@/contexts/workflow-context'
 import { format } from 'date-fns'
-import { ko } from 'date-fns/locale'
+import { enUS, ko } from 'date-fns/locale'
+import { useStore } from '@/store/useStore'
+import { getTranslation } from '@/lib/i18n'
 
 export function AIWidget() {
   const { drawerState, closeDrawer, aiAnalysis, generateAIReport, clearAIReport } = useWorkflow()
+  const language = useStore((state) => state.language)
+  const text = getTranslation(language)
+  const dateLocale = language === 'ko' ? ko : enUS
 
   const handleClose = () => {
     closeDrawer('aiWidget')
@@ -28,11 +33,9 @@ export function AIWidget() {
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Bot className="h-5 w-5 text-primary" />
-            AI 매출 분석 비서
+            {text.aiWidget.title}
           </SheetTitle>
-          <SheetDescription>
-            AI가 매출 데이터를 분석하여 인사이트를 제공합니다.
-          </SheetDescription>
+          <SheetDescription>{text.aiWidget.description}</SheetDescription>
         </SheetHeader>
 
         <div className="flex-1 flex flex-col mt-4">
@@ -46,12 +49,12 @@ export function AIWidget() {
               {aiAnalysis.isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  분석 중...
+                  {text.aiWidget.generating}
                 </>
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  이번 주 분석 리포트 생성
+                  {text.aiWidget.generate}
                 </>
               )}
             </Button>
@@ -72,18 +75,16 @@ export function AIWidget() {
                   <div className="h-16 w-16 rounded-full border-4 border-muted animate-pulse" />
                   <Bot className="absolute inset-0 m-auto h-8 w-8 text-primary" />
                 </div>
-                <p className="mt-4 text-sm text-muted-foreground">
-                  데이터를 분석하고 있습니다...
-                </p>
+                <p className="mt-4 text-sm text-muted-foreground">{text.aiWidget.analyzing}</p>
               </div>
             ) : aiAnalysis.lastReport ? (
               <div className="space-y-4">
                 {/* Report Metadata */}
                 <div className="rounded-lg bg-muted/50 p-3">
                   <p className="text-xs text-muted-foreground">
-                    생성 시간:{' '}
+                    {text.aiWidget.generatedAt}:{' '}
                     {aiAnalysis.reportGeneratedAt &&
-                      format(aiAnalysis.reportGeneratedAt, 'PPP p', { locale: ko })}
+                      format(aiAnalysis.reportGeneratedAt, 'PPP p', { locale: dateLocale })}
                   </p>
                 </div>
 
@@ -100,16 +101,16 @@ export function AIWidget() {
 
                 {/* Quick Actions */}
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">빠른 질문</p>
+                  <p className="text-sm font-medium">{text.aiWidget.quickQuestions}</p>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={generateAIReport}>
-                      매출이 가장 높은 요일은?
+                      {text.aiWidget.question1}
                     </Button>
                     <Button variant="outline" size="sm" onClick={generateAIReport}>
-                      배달앱 트렌드 분석
+                      {text.aiWidget.question2}
                     </Button>
                     <Button variant="outline" size="sm" onClick={generateAIReport}>
-                      현금 차액 원인 분석
+                      {text.aiWidget.question3}
                     </Button>
                   </div>
                 </div>
@@ -119,10 +120,8 @@ export function AIWidget() {
                 <div className="rounded-full bg-muted p-4 mb-4">
                   <Bot className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <h3 className="font-medium mb-2">리포트가 없습니다</h3>
-                <p className="text-sm text-muted-foreground max-w-[250px]">
-                  &apos;이번 주 분석 리포트 생성&apos; 버튼을 클릭하여 AI 분석을 시작하세요.
-                </p>
+                <h3 className="font-medium mb-2">{text.aiWidget.emptyTitle}</h3>
+                <p className="text-sm text-muted-foreground max-w-[250px]">{text.aiWidget.emptyDescription}</p>
               </div>
             )}
           </ScrollArea>

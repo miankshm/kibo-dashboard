@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import type { StoreId } from '@/store/useStore'
+import { useStore } from '@/store/useStore'
 
 // 데이터 입력 폼 상태
 export interface DailySalesFormData {
@@ -148,12 +149,15 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const generateAIReport = useCallback(async () => {
+    const language = useStore.getState().language
     setAIAnalysis((prev) => ({ ...prev, isLoading: true }))
     
     // Simulate AI API call
     await new Promise((resolve) => setTimeout(resolve, 2000))
-    
-    const mockReport = `이번 주 매출 분석 리포트입니다.
+
+    const mockReport =
+      language === 'ko'
+        ? `이번 주 매출 분석 리포트입니다.
 
 📊 주요 지표:
 • 총 매출: 전주 대비 12.5% 증가
@@ -169,6 +173,22 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
 🎯 추천 액션:
 • 배달앱 프로모션 강화를 고려해 보세요.
 • 주말 인력 배치 최적화가 필요합니다.`
+        : `This week's sales analysis report.
+
+📊 Key metrics:
+• Total sales: up 12.5% week over week
+• Card payments: 65% share (+3% WoW)
+• Cash payments: 20% share (-2% WoW)
+• Delivery sales: 15% share (+5% WoW)
+
+💡 Insights:
+• Weekend evening hours delivered the highest sales.
+• Uber Eats orders grew 30% faster than DoorDash.
+• Cash usage continues to trend downward.
+
+🎯 Recommended actions:
+• Consider strengthening delivery platform promotions.
+• Optimize staffing for weekend coverage.`
 
     setAIAnalysis({
       isLoading: false,

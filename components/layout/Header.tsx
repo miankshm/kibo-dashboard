@@ -1,14 +1,16 @@
 'use client'
 
-import { Menu, Moon, Sun, Bot } from 'lucide-react'
+import { Menu, Moon, Sun, Bot, Languages } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useStore } from '@/store/useStore'
 import { useWorkflow } from '@/contexts/workflow-context'
 import { StoreSelector } from '@/components/dashboard/StoreSelector'
+import { getTranslation } from '@/lib/i18n'
 
 export function Header() {
-  const { toggleSidebar, isDarkMode, toggleDarkMode } = useStore()
+  const { toggleSidebar, isDarkMode, toggleDarkMode, language, toggleLanguage } = useStore()
   const { openDrawer } = useWorkflow()
+  const text = getTranslation(language)
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -21,7 +23,7 @@ export function Header() {
           onClick={toggleSidebar}
         >
           <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle menu</span>
+          <span className="sr-only">{text.header.menu}</span>
         </Button>
 
         {/* Logo */}
@@ -47,7 +49,17 @@ export function Header() {
             className="text-primary hover:bg-primary/10"
           >
             <Bot className="h-5 w-5" />
-            <span className="sr-only">AI 분석</span>
+            <span className="sr-only">{text.header.ai}</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            onClick={toggleLanguage}
+            className="gap-2 px-3 text-sm font-medium"
+          >
+            <Languages className="h-4 w-4" />
+            <span>{language === 'ko' ? 'EN' : 'KR'}</span>
+            <span className="sr-only">{text.header.language}</span>
           </Button>
 
           {/* Dark Mode Toggle */}
@@ -61,7 +73,7 @@ export function Header() {
             ) : (
               <Moon className="h-5 w-5" />
             )}
-            <span className="sr-only">Toggle theme</span>
+            <span className="sr-only">{text.header.theme}</span>
           </Button>
         </div>
       </div>

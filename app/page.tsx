@@ -11,9 +11,13 @@ import { HolidayComparison } from '@/components/dashboard/HolidayComparison'
 import { DailySalesForm } from '@/components/forms/DailySalesForm'
 import { AIWidget } from '@/components/dashboard/AIWidget'
 import { useWorkflow } from '@/contexts/workflow-context'
+import { useStore } from '@/store/useStore'
+import { getTranslation } from '@/lib/i18n'
 
 export default function DashboardPage() {
   const { openDrawer } = useWorkflow()
+  const language = useStore((state) => state.language)
+  const text = getTranslation(language)
 
   return (
     <div className="relative min-h-screen bg-background">
@@ -31,14 +35,12 @@ export default function DashboardPage() {
             {/* Dashboard Header */}
             <section id="dashboard" className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">대시보드</h1>
-                <p className="text-muted-foreground">
-                  Kibo Sushi 통합 매출 관리 시스템에 오신 것을 환영합니다.
-                </p>
+                <h1 className="text-3xl font-bold tracking-tight">{text.app.dashboardTitle}</h1>
+                <p className="text-muted-foreground">{text.app.dashboardDescription}</p>
               </div>
               <Button onClick={() => openDrawer('dailySalesForm')} className="gap-2">
                 <Plus className="h-4 w-4" />
-                일일 매출 입력
+                {text.app.dailySalesButton}
               </Button>
             </section>
 
@@ -60,7 +62,7 @@ export default function DashboardPage() {
         className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg lg:hidden"
         onClick={() => openDrawer('aiWidget')}
       >
-        <span className="sr-only">AI 분석</span>
+        <span className="sr-only">{text.app.floatingAi}</span>
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"

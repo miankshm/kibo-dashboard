@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel'
 import { useWorkflow } from '@/contexts/workflow-context'
 import { useStore } from '@/store/useStore'
+import { getTranslation } from '@/lib/i18n'
 
 type CarouselApi = UseEmblaCarouselType[1]
 
@@ -52,12 +53,13 @@ function formatCurrency(amount: number) {
   return `$${Math.abs(Math.round(amount)).toLocaleString()}`
 }
 
-function formatRange(start: Date, end: Date) {
-  const startLabel = start.toLocaleDateString('en-US', {
+function formatRange(start: Date, end: Date, language: 'ko' | 'en') {
+  const locale = language === 'ko' ? 'ko-KR' : 'en-US'
+  const startLabel = start.toLocaleDateString(locale, {
     month: 'long',
     day: 'numeric',
   })
-  const endLabel = end.toLocaleDateString('en-US', {
+  const endLabel = end.toLocaleDateString(locale, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -86,7 +88,8 @@ function generateSampleEntries(endDate: Date, scope: 'all' | 'kibo-north' | 'kib
 
 export function CashFlowAnalysis() {
   const { dailySalesEntries } = useWorkflow()
-  const { selectedStoreId } = useStore()
+  const { selectedStoreId, language } = useStore()
+  const text = getTranslation(language)
   const [carouselApi, setCarouselApi] = useState<CarouselApi>()
   const [currentIndex, setCurrentIndex] = useState(0)
 
@@ -176,9 +179,9 @@ export function CashFlowAnalysis() {
   return (
     <section id="cashflow" className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">현금 유입 분석</h2>
+        <h2 className="text-2xl font-bold tracking-tight">{text.cashFlow.title}</h2>
         <p className="text-muted-foreground">
-          {formatRange(currentPeriod.start, currentPeriod.end)}
+          {formatRange(currentPeriod.start, currentPeriod.end, language)}
         </p>
       </div>
 
@@ -190,29 +193,29 @@ export function CashFlowAnalysis() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">예상 현금</CardTitle>
+                      <CardTitle className="text-sm font-medium text-muted-foreground">{text.cashFlow.expectedCash}</CardTitle>
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{formatCurrency(period.totalExpected)}</div>
-                      <p className="text-xs text-muted-foreground">cashSales 합계</p>
+                      <p className="text-xs text-muted-foreground">{text.cashFlow.expectedCashNote}</p>
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">실제 마감 현금</CardTitle>
+                      <CardTitle className="text-sm font-medium text-muted-foreground">{text.cashFlow.actualCash}</CardTitle>
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{formatCurrency(period.totalActual)}</div>
-                      <p className="text-xs text-muted-foreground">actualClosingCash 합계</p>
+                      <p className="text-xs text-muted-foreground">{text.cashFlow.actualCashNote}</p>
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">차액</CardTitle>
+                      <CardTitle className="text-sm font-medium text-muted-foreground">{text.cashFlow.diff}</CardTitle>
                       <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -221,16 +224,14 @@ export function CashFlowAnalysis() {
                       </div>
                       <div className={`flex items-center gap-1 text-xs ${period.totalDiff >= 0 ? 'text-success' : 'text-destructive'}`}>
                         {period.totalDiff >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                        <span>
-                          {period.totalExpected === 0 ? '0.0' : ((period.totalDiff / period.totalExpected) * 100).toFixed(2)}%
-                        </span>
+                        <span>{text.cashFlow.diffVsExpected} {period.totalExpected === 0 ? '0.0' : ((period.totalDiff / period.totalExpected) * 100).toFixed(2)}%</span>
                       </div>
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">전 2주 대비</CardTitle>
+                      <CardTitle className="text-sm font-medium text-muted-foreground">{text.cashFlow.vsPrevious}</CardTitle>
                       <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -256,9 +257,9 @@ export function CashFlowAnalysis() {
         <CardHeader>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle>2주 상세 내역</CardTitle>
+              <CardTitle>{text.cashFlow.detailTitle}</CardTitle>
               <CardDescription>
-                차액 발생: {currentPeriod.discrepancyCount}건 중 마이너스 {currentPeriod.negativeDiscrepancyCount}건
+                {text.cashFlow.detailDescription.replace('{discrepancyCount}', String(currentPeriod.discrepancyCount)).replace('{negativeDiscrepancyCount}', String(currentPeriod.negativeDiscrepancyCount))}
               </CardDescription>
             </div>
             <Badge variant="secondary" className="w-fit">
@@ -270,7 +271,7 @@ export function CashFlowAnalysis() {
           <div className="space-y-3 max-h-[400px] overflow-y-auto">
             {currentPeriod.entries.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
-                현재 2주 구간에 입력된 데이터가 없습니다.
+                {text.cashFlow.rangeEmpty}
               </div>
             ) : (
               currentPeriod.entries.map((item) => {
@@ -283,21 +284,21 @@ export function CashFlowAnalysis() {
                   >
                     <div className="flex items-center gap-4">
                       <div className="text-sm font-medium">
-                        {item.date.toLocaleDateString('en-US', {
+                        {item.date.toLocaleDateString(language === 'ko' ? 'ko-KR' : 'en-US', {
                           month: 'short',
                           day: 'numeric',
                         })}
                       </div>
                       <div className="hidden gap-4 text-sm text-muted-foreground sm:flex">
-                        <span>예상: {formatCurrency(item.expected)}</span>
-                        <span>실제: {formatCurrency(item.actual)}</span>
+                        <span>{text.cashFlow.expected}: {formatCurrency(item.expected)}</span>
+                        <span>{text.cashFlow.actual}: {formatCurrency(item.actual)}</span>
                       </div>
                     </div>
                     <Badge
                       variant={diff === 0 ? 'secondary' : diff > 0 ? 'default' : 'destructive'}
                       className={diff > 0 ? 'bg-success text-success-foreground' : ''}
                     >
-                      {diff === 0 ? '일치' : diff > 0 ? `+${formatCurrency(diff)}` : `-${formatCurrency(diff)}`}
+                      {diff === 0 ? text.cashFlow.match : diff > 0 ? `+${formatCurrency(diff)}` : `-${formatCurrency(diff)}`}
                     </Badge>
                   </div>
                 )

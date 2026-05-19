@@ -6,6 +6,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useStore } from '@/store/useStore'
 import { useWorkflow } from '@/contexts/workflow-context'
 import { cn } from '@/lib/utils'
+import { getTranslation } from '@/lib/i18n'
 
 interface NavItem {
   icon: React.ElementType
@@ -15,24 +16,25 @@ interface NavItem {
 }
 
 export function Sidebar() {
-  const { isSidebarOpen, setSidebarOpen } = useStore()
+  const { isSidebarOpen, setSidebarOpen, language } = useStore()
   const { openDrawer } = useWorkflow()
+  const text = getTranslation(language)
 
   const navItems: NavItem[] = [
-    { icon: LayoutDashboard, label: '대시보드', href: '#dashboard' },
-    { icon: TrendingUp, label: '매출 요약', href: '#sales' },
-    { icon: Wallet, label: '현금 흐름', href: '#cashflow' },
-    { icon: Calendar, label: '홀리데이 비교', href: '#holiday' },
+    { icon: LayoutDashboard, label: text.sidebar.dashboard, href: '#dashboard' },
+    { icon: TrendingUp, label: text.sidebar.salesSummary, href: '#sales' },
+    { icon: Wallet, label: text.sidebar.cashFlow, href: '#cashflow' },
+    { icon: Calendar, label: text.sidebar.holidayComparison, href: '#holiday' },
     {
       icon: FileInput,
-      label: '일일 매출 입력',
+      label: text.sidebar.dailySalesInput,
       href: '#',
       action: () => {
         openDrawer('dailySalesForm')
         setSidebarOpen(false)
       },
     },
-    { icon: Settings, label: '설정', href: '#settings' },
+    { icon: Settings, label: text.sidebar.settings, href: '#settings' },
   ]
 
   const handleNavClick = (item: NavItem) => {

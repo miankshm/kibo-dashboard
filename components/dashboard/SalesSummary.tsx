@@ -23,6 +23,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel'
 import { useWorkflow } from '@/contexts/workflow-context'
 import { useStore } from '@/store/useStore'
+import { getTranslation } from '@/lib/i18n'
 
 type CarouselApi = UseEmblaCarouselType[1]
 
@@ -85,8 +86,8 @@ function combineDayData(
   }
 }
 
-function formatDate(date: Date) {
-  return date.toLocaleDateString('en-US', {
+function formatDate(date: Date, language: 'ko' | 'en') {
+  return date.toLocaleDateString(language === 'ko' ? 'ko-KR' : 'en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -130,7 +131,7 @@ function SalesCard({ title, value, change, icon: Icon }: SalesCardProps) {
         <div className="text-2xl font-bold">{value}</div>
         <div className={`flex items-center gap-1 text-xs ${isPositive ? 'text-success' : 'text-destructive'}`}>
           {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-          <span>{isPositive ? '+' : ''}{change}% 전일 대비</span>
+          <span>{isPositive ? '+' : ''}{change}%</span>
         </div>
       </CardContent>
     </Card>
@@ -139,8 +140,9 @@ function SalesCard({ title, value, change, icon: Icon }: SalesCardProps) {
 
 export function SalesSummary() {
   const { showGrossSales, toggleSalesMode, selectedPeriod, setSelectedPeriod, dailySalesFormData } = useWorkflow()
-  const { selectedStoreId } = useStore()
+  const { selectedStoreId, language } = useStore()
   const { dailySalesEntries } = useWorkflow()
+  const text = getTranslation(language)
 
   const filteredEntries = useMemo(() => {
     if (selectedStoreId === 'all') return dailySalesEntries
@@ -197,7 +199,12 @@ export function SalesSummary() {
   const currentSlide = slides[currentIndex] ?? slides[slides.length - 1]
   const dayData = currentSlide.data
   const displayTotal = showGrossSales ? dayData.total : Math.round(dayData.total * 0.85)
-  const selectedPeriodLabel = selectedPeriod === 'daily' ? '일별' : selectedPeriod === 'weekly' ? '주별' : '월별'
+  const selectedPeriodLabel =
+    selectedPeriod === 'daily'
+      ? text.salesSummary.daily
+      : selectedPeriod === 'weekly'
+        ? text.salesSummary.weekly
+        : text.salesSummary.monthly
 
   const chartData = useMemo(() => {
     const periodData = mockSalesData[selectedPeriod]
@@ -209,7 +216,7 @@ export function SalesSummary() {
       datasets: [
         {
           type: 'bar' as const,
-          label: showGrossSales ? '매출 막대' : '순매출 막대',
+          label: showGrossSales ? text.salesSummary.gross : text.salesSummary.net,
           data: values,
           backgroundColor: 'oklch(0.527 0.154 150.069 / 0.18)',
           borderColor: 'oklch(0.527 0.154 150.069 / 0.35)',
@@ -219,7 +226,7 @@ export function SalesSummary() {
         },
         {
           type: 'line' as const,
-          label: showGrossSales ? '총매출 (Gross)' : '순매출 (Net)',
+          label: showGrossSales ? text.salesSummary.gross : text.salesSummary.net,
           data: values,
           borderColor: 'oklch(0.527 0.154 150.069)',
           backgroundColor: 'oklch(0.527 0.154 150.069 / 0.22)',
@@ -236,7 +243,7 @@ export function SalesSummary() {
         },
       ],
     }
-  }, [selectedPeriod, showGrossSales, selectedStoreId])
+  }, [selectedPeriod, showGrossSales, selectedStoreId, text])
 
   const chartPeriodTotal = useMemo(() => {
     const periodData = mockSalesData[selectedPeriod]
@@ -283,15 +290,15 @@ export function SalesSummary() {
     <section id="sales" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">매출 요약</h2>
+          <h2 className="text-2xl font-bold tracking-tight">{text.sidebar.salesSummary}</h2>
           <p className="text-muted-foreground">
-            Total{' '}
+            {text.salesSummary.totalLabel}{' '}
             <span className="text-xl font-bold text-foreground">
               ${displayTotal.toLocaleString()}
             </span>
           </p>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {formatDate(currentSlide.date)}
+            {formatDate(currentSlide.date, language)}
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -302,7 +309,7 @@ export function SalesSummary() {
               onCheckedChange={toggleSalesMode}
             />
             <Label htmlFor="sales-mode" className="text-sm">
-              {showGrossSales ? '총매출 (Gross)' : '순매출 (Net)'}
+              {showGrossSales ? text.salesSummary.gross : text.salesSummary.net}
             </Label>
           </div>
         </div>
@@ -321,25 +328,25 @@ export function SalesSummary() {
                 <CarouselItem key={date.toISOString()}>
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <SalesCard
-                      title="매장 방문"
+                      title={text.salesSummary.storeVisits}
                       value={`$${Math.round(slideTotal * 0.45).toLocaleString()}`}
                       change={data.instore.change}
                       icon={StoreIcon}
                     />
                     <SalesCard
-                      title="카드 결제"
+                      title={text.salesSummary.cardSales}
                       value={`$${Math.round(slideTotal * 0.35).toLocaleString()}`}
                       change={data.card.change}
                       icon={CreditCard}
                     />
                     <SalesCard
-                      title="현금 결제"
+                      title={text.salesSummary.cashSales}
                       value={`$${Math.round(slideTotal * 0.15).toLocaleString()}`}
                       change={data.cash.change}
                       icon={Banknote}
                     />
                     <SalesCard
-                      title="배달앱 (Uber+DoorDash)"
+                      title={text.salesSummary.deliverySales}
                       value={`$${Math.round(slideTotal * 0.20).toLocaleString()}`}
                       change={data.delivery.change}
                       icon={Truck}
@@ -359,18 +366,18 @@ export function SalesSummary() {
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle>매출 추이</CardTitle>
+              <CardTitle>{text.salesSummary.trendTitle}</CardTitle>
               <CardDescription>
                 <span className="font-medium text-foreground">
-                  {selectedPeriodLabel} 누적 Total ${Math.round(chartPeriodTotal).toLocaleString()}
+                  {selectedPeriodLabel} {text.salesSummary.periodTotal} ${Math.round(chartPeriodTotal).toLocaleString()}
                 </span>
               </CardDescription>
             </div>
             <Tabs value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as 'daily' | 'weekly' | 'monthly')}>
               <TabsList>
-                <TabsTrigger value="daily">일별</TabsTrigger>
-                <TabsTrigger value="weekly">주별</TabsTrigger>
-                <TabsTrigger value="monthly">월별</TabsTrigger>
+                <TabsTrigger value="daily">{text.salesSummary.daily}</TabsTrigger>
+                <TabsTrigger value="weekly">{text.salesSummary.weekly}</TabsTrigger>
+                <TabsTrigger value="monthly">{text.salesSummary.monthly}</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
