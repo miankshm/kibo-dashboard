@@ -3,11 +3,11 @@ import { listSales, upsertSale } from '@/lib/mock-data'
 import type { DailySalesInput, NonAggregateStoreKey, StoreKey } from '@/lib/types'
 
 function isStoreKey(value: string | null): value is StoreKey {
-  return value === 'all' || value === 'kibo-north' || value === 'kibo-south'
+  return value === 'all' || value === 'st-clair' || value === 'woodbridge'
 }
 
 function isPersistedStoreKey(value: string | undefined): value is NonAggregateStoreKey {
-  return value === 'kibo-north' || value === 'kibo-south'
+  return value === 'st-clair' || value === 'woodbridge'
 }
 
 export async function GET(request: NextRequest) {
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
   if (!isPersistedStoreKey(body.storeKey)) {
     return NextResponse.json(
-      { success: false, message: 'Invalid storeKey', errors: [{ field: 'storeKey', message: 'storeKey must be kibo-north or kibo-south' }] },
+      { success: false, message: 'Invalid storeKey', errors: [{ field: 'storeKey', message: 'storeKey must be st-clair or woodbridge' }] },
       { status: 400 }
     )
   }

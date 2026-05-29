@@ -18,6 +18,13 @@ Kibo Dashboard는 AI 기반 통합 매출 관리 및 홀리데이 분석 시스�
 - Bulk Upload 지원
 - AI 분석 및 Weather 확장성 확보
 
+중요한 동기화 규칙:
+
+- 운영 지점은 정확히 2개다: St. Clair, Woodbridge
+- 프론트/API의 `storeKey`는 `st-clair`, `woodbridge`, `all`만 허용한다
+- `all`은 집계 전용 가상 범위이며 DB의 `stores` 테이블에는 저장하지 않는다
+- 화면 표시명(Display Name)은 St. Clair, Woodbridge로 고정한다
+
 ---
 
 ## 2. Database Architecture
@@ -43,14 +50,17 @@ Kibo Dashboard는 AI 기반 통합 매출 관리 및 홀리데이 분석 시스�
 
 ### 3.2. 핵심 필드 정합성 규칙
 
-- 프론트/API의 actualClosingCash는 DB의 actual_closing_cash로 매핑한다.
-- 프론트/API의 doorDashSales는 DB의 doordash_sales로 매핑한다.
-- 프론트 storeKey(kibo-north, kibo-south)는 DB stores.key로 관리하고, 내부 조인/무결성은 stores.id(UUID)로 처리한다.
+- 프론트/API의 `actualClosingCash`는 DB의 `actual_closing_cash`로 매핑한다.
+- 프론트/API의 `doorDashSales`는 DB의 `doordash_sales`로 매핑한다.
+- 프론트/API의 `tips`는 DB의 `card_tip`으로 매핑한다.
+- 프론트/API의 `storeKey`(`st-clair`, `woodbridge`)는 DB `stores.key`로 관리한다.
+- 내부 조인 및 무결성은 `stores.id`(UUID) 기준으로 처리한다.
 
 ### 3.3. 이전 문서 대비 변경 포인트
 
-- sales.actual_cash_closing 명칭은 actual_closing_cash로 표준화
-- stores.key(슬러그) 필드 추가
+- `sales.actual_cash_closing` 명칭은 `actual_closing_cash`로 표준화
+- `stores.key`(슬러그) 필드 유지
+- 지점 키를 `kibo-north`, `kibo-south`에서 `st-clair`, `woodbridge`로 변경
 - 금액 필드 음수 방지 CHECK 제약 명시
 - 프론트 입력 계약 기준 매핑 표 추가
 
@@ -152,7 +162,7 @@ CREATE TABLE admin_invitations (
 
 - 다중 지점 관리
 - 대시보드 필터 기준
-- 프론트 storeKey와 내부 UUID 연결
+- 프론트 `storeKey`와 내부 UUID 연결
 
 ### Schema
 
@@ -180,14 +190,19 @@ CREATE TABLE stores (
 );
 ```
 
-### key 예시
+### key / name 예시 데이터
 
-- kibo-north
-- kibo-south
+```sql
+INSERT INTO stores (key, name, code)
+VALUES
+  ('st-clair', 'St. Clair', 'KB-STC'),
+  ('woodbridge', 'Woodbridge', 'KB-WDB');
+```
 
 참고:
 
-- all은 집계 전용 가상 범위이며 stores 테이블에는 저장하지 않는다.
+- `all`은 집계 전용 가상 범위이며 `stores` 테이블에는 저장하지 않는다.
+- 프론트의 드롭다운 표시명은 `name` 기준으로 구성한다.
 
 ---
 
@@ -254,7 +269,8 @@ CREATE TABLE sales (
     CHECK (uber_eats_sales >= 0),
     CHECK (doordash_sales >= 0),
     CHECK (cash_and_carry_sales >= 0),
-    CHECK (actual_closing_cash >= 0)
+    CHECK (actual_closing_cash >= 0),
+    CHECK (expected_cash_amount >= 0)
 );
 ```
 
@@ -413,12 +429,17 @@ CREATE TABLE ai_analysis_reports (
 );
 ```
 
-report_type 예시:
+`report_type` 예시:
 
 - WEEKLY
 - MONTHLY
 - HOLIDAY
 - CASH_FLOW
+
+참고:
+
+- `store_id`가 NULL이면 전체 집계(`all`) 기반 리포트로 해석할 수 있다.
+- `store_id`가 존재하면 St. Clair 또는 Woodbridge 단일 지점 리포트다.
 
 ---
 
@@ -457,12 +478,21 @@ CREATE TABLE weather_snapshots (
 | uberEatsSales | uberEatsSales | uber_eats_sales |
 | doorDashSales | doorDashSales | doordash_sales |
 | cashAndCarrySales | cashAndCarrySales | cash_and_carry_sales |
-| tips | tips 또는 cardTip 정책 매핑 | card_tip |
+| tips | tips | card_tip |
 | actualClosingCash | actualClosingCash | actual_closing_cash |
+
+### Store Mapping 규칙
+
+| UI Label | API storeKey | DB stores.key |
+|---|---|---|
+| All Stores | all | 저장 안 함 |
+| St. Clair | st-clair | st-clair |
+| Woodbridge | woodbridge | woodbridge |
 
 정책 메모:
 
-- 프론트의 tips를 card_tip으로 저장할지 별도 컬럼으로 분리할지는 운영정책에 따르되, API 문서에서 명시적으로 고정한다.
+- 프론트의 `tips`는 현재 기준안에서 `card_tip`으로 저장한다.
+- 프론트의 전체 보기 값 `all`은 DB에 저장되지 않으며, API/서비스 계층에서 집계 처리한다.
 
 ---
 
@@ -495,7 +525,7 @@ ON audit_logs(record_id);
 관리자 입력
 → Validation
 → stores.key/storeId 해석
-→ Sales upsert(UNIQUE store_id+sales_date)
+→ Sales upsert(UNIQUE store_id + sales_date)
 → Audit Log 생성
 → Dashboard 집계 반영
 → AI 분석 대상 데이터 준비
@@ -549,14 +579,28 @@ Holiday 선택
 
 ## 11. Migration Notes
 
-기존 스키마에 actual_cash_closing 컬럼을 사용 중이면 다음 중 하나를 선택:
+기존 스키마가 이전 store key인 `kibo-north`, `kibo-south`를 사용 중이면 다음 순서로 마이그레이션한다:
 
-- 권장: actual_closing_cash로 컬럼 rename
-- 대안: actual_cash_closing 유지 + API/ORM 레벨 alias 매핑
+```sql
+UPDATE stores
+SET key = 'st-clair',
+    name = 'St. Clair'
+WHERE key = 'kibo-north';
+
+UPDATE stores
+SET key = 'woodbridge',
+    name = 'Woodbridge'
+WHERE key = 'kibo-south';
+```
+
+기존 스키마에 `actual_cash_closing` 컬럼을 사용 중이면 다음 중 하나를 선택:
+
+- 권장: `actual_closing_cash`로 컬럼 rename
+- 대안: `actual_cash_closing` 유지 + API/ORM 레벨 alias 매핑
 
 중요:
 
-- 문서/코드/DB 중 하나라도 명칭이 다르면 현금 분석 및 폼 저장 로직에서 장애가 발생할 수 있다.
+- 문서/코드/DB 중 하나라도 지점 키 또는 현금 컬럼 명칭이 다르면 대시보드 집계, 폼 저장, Holiday 비교에서 장애가 발생할 수 있다.
 
 ---
 
@@ -566,7 +610,7 @@ Holiday 선택
 
 핵심 보장 항목:
 
-- 매출 데이터 안정 저장
+- St. Clair / Woodbridge 2개 지점 기준 매출 데이터 안정 저장
 - Holiday 중심 비교 분석
 - 현금 흐름 추적
 - 관리자 수정 이력 추적

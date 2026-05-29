@@ -44,7 +44,7 @@ const createFormSchema = (language: Language) => {
   const text = getTranslation(language)
 
   return z.object({
-    storeId: z.enum(['kibo-north', 'kibo-south']).optional(),
+    storeId: z.enum(['st-clair', 'woodbridge']).optional(),
     date: z.date({
       required_error: text.dailySalesForm.selectDateError,
     }),

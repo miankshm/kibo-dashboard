@@ -1,4 +1,4 @@
-export type StoreKey = 'all' | 'kibo-north' | 'kibo-south'
+export type StoreKey = 'all' | 'st-clair' | 'woodbridge'
 export type NonAggregateStoreKey = Exclude<StoreKey, 'all'>
 export type SalesPeriod = 'daily' | 'weekly' | 'monthly'
 export type SalesMode = 'gross' | 'net'

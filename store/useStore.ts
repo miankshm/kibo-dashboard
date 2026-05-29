@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type StoreId = 'all' | 'kibo-north' | 'kibo-south'
+export type StoreId = 'all' | 'st-clair' | 'woodbridge'
 export type Language = 'ko' | 'en'
 
 export interface LocalizedText {
@@ -21,14 +21,14 @@ export const STORES: Store[] = [
     location: { ko: '모든 지점', en: 'All locations' },
   },
   {
-    id: 'kibo-north',
-    name: { ko: 'Kibo Sushi North', en: 'Kibo Sushi North' },
-    location: { ko: 'North Location', en: 'North Location' },
+    id: 'st-clair',
+    name: { ko: 'St. Clair', en: 'St. Clair' },
+    location: { ko: 'St. Clair 지점', en: 'St. Clair Location' },
   },
   {
-    id: 'kibo-south',
-    name: { ko: 'Kibo Sushi South', en: 'Kibo Sushi South' },
-    location: { ko: 'South Location', en: 'South Location' },
+    id: 'woodbridge',
+    name: { ko: 'Woodbridge', en: 'Woodbridge' },
+    location: { ko: 'Woodbridge 지점', en: 'Woodbridge Location' },
   },
 ]
 

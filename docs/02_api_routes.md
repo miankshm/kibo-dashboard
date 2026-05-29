@@ -8,6 +8,12 @@ Kibo Dashboard는 AI 기반 통합 매출 관리 및 Holiday 분석 시스템이
 
 본 문서는 최신 프론트엔드 명세([docs/03_frontend_ui.md](docs/03_frontend_ui.md))와 DB 명세([docs/01_db_schema.md](docs/01_db_schema.md))를 반영해 Frontend ↔ Backend ↔ Database 데이터 계약을 정의한다.
 
+중요한 동기화 규칙:
+
+- 운영 지점은 정확히 2개다: St. Clair, Woodbridge
+- API의 `storeKey`는 `st-clair`, `woodbridge`, `all`만 허용한다
+- `all`은 대시보드/비교용 집계 범위이며 단일 저장 엔터티를 의미하지 않는다
+
 ---
 
 ## 2. Backend Architecture
@@ -83,12 +89,20 @@ Authorization: Bearer access_token
 
 ### Store 식별 규칙
 
-- 분석/대시보드 API: storeKey 허용
-- create/update/single 조회 API: storeId(UUID) 또는 storeKey(서버 내부 변환) 허용
-- 허용 storeKey:
-- all (집계 전용)
-- kibo-north
-- kibo-south
+- 분석/대시보드 API: `storeKey` 허용
+- create/update/single 조회 API: `storeId`(UUID) 또는 `storeKey`(서버 내부 변환) 허용
+- 허용 `storeKey`:
+- `all` (집계 전용)
+- `st-clair`
+- `woodbridge`
+
+### Store 표시명 규칙
+
+| storeKey | Display Name |
+|---|---|
+| all | All Stores |
+| st-clair | St. Clair |
+| woodbridge | Woodbridge |
 
 ---
 
@@ -294,13 +308,13 @@ Access Token 재발급 API
   "data": [
     {
       "id": "uuid",
-      "key": "kibo-north",
-      "name": "Kibo Sushi North"
+      "key": "st-clair",
+      "name": "St. Clair"
     },
     {
       "id": "uuid",
-      "key": "kibo-south",
-      "name": "Kibo Sushi South"
+      "key": "woodbridge",
+      "name": "Woodbridge"
     }
   ]
 }
@@ -318,11 +332,19 @@ Access Token 재발급 API
 
 ```json
 {
-  "key": "kibo-north",
-  "name": "Kibo Sushi North",
-  "code": "KB-N01"
+  "key": "st-clair",
+  "name": "St. Clair",
+  "code": "KB-STC"
 }
 ```
+
+#### Validation Rules
+
+| Field | Rule |
+|---|---|
+| key | `st-clair`, `woodbridge` 같은 URL-safe slug 형식 |
+| name | 운영 표시명 |
+| code | 내부 관리 코드, 중복 불가 |
 
 ---
 
@@ -336,7 +358,7 @@ Access Token 재발급 API
 
 ```json
 {
-  "name": "Kibo Sushi North Toronto"
+  "name": "St. Clair"
 }
 ```
 
@@ -353,12 +375,13 @@ Access Token 재발급 API
 중요:
 
 - 프론트엔드는 동일 지점+날짜 재저장 시 최신 값으로 갱신하는 UX이므로 서버도 upsert를 지원한다.
+- `all`은 집계 전용 값이므로 저장 API에서는 허용하지 않는다.
 
 #### Request
 
 ```json
 {
-  "storeKey": "kibo-north",
+  "storeKey": "st-clair",
   "salesDate": "2026-05-09",
 
   "cardSales": 4500,
@@ -383,7 +406,7 @@ Access Token 재발급 API
 | salesDate | 정책상 최소 2020-01-01 |
 | 금액 필드 | 음수 불가 |
 | storeKey/storeId | 존재하는 Store |
-| storeKey | all 불가 (집계 전용 값) |
+| storeKey | `all` 불가 |
 
 #### Backend Logic
 
@@ -405,7 +428,7 @@ Access Token 재발급 API
   "data": {
     "id": "uuid",
     "storeId": "uuid",
-    "storeKey": "kibo-north",
+    "storeKey": "st-clair",
     "salesDate": "2026-05-09",
     "totalSales": 7500,
     "cashDifference": 200,
@@ -462,7 +485,7 @@ Access Token 재발급 API
 #### Query Params
 
 ```text
-?storeKey=kibo-north
+?storeKey=st-clair
 &startDate=2026-05-01
 &endDate=2026-05-31
 &page=1
@@ -480,7 +503,7 @@ Access Token 재발급 API
     "items": [
       {
         "id": "uuid",
-        "storeKey": "kibo-north",
+        "storeKey": "st-clair",
         "salesDate": "2026-05-09",
         "cardSales": 4500,
         "cashSales": 1200,
@@ -543,8 +566,8 @@ Access Token 재발급 API
 
 #### Enum
 
-- period: daily | weekly | monthly
-- salesMode: gross | net
+- `period`: `daily` | `weekly` | `monthly`
+- `salesMode`: `gross` | `net`
 
 #### Response
 
@@ -720,7 +743,7 @@ Holiday 매출 비교 API
 
 #### Enum
 
-- range: 1y | 3y | 5y
+- `range`: `1y` | `3y` | `5y`
 
 #### Backend Flow
 
@@ -825,7 +848,7 @@ AI 매출 인사이트 생성 API
   "success": true,
   "data": {
     "reportId": "uuid",
-    "summary": "이번 주 매출은 지난주 대비 12.5% 증가했습니다.",
+    "summary": "이번 주 St. Clair 및 Woodbridge 매출은 지난주 대비 12.5% 증가했습니다.",
     "generatedAt": "2026-05-29T10:20:30Z"
   }
 }
@@ -1047,8 +1070,10 @@ src/
 
 이전 계약과의 호환을 위해 서버에서 다음 alias를 임시 허용할 수 있다:
 
-- actualCashClosing -> actualClosingCash (deprecated)
-- doordashSales -> doorDashSales (preferred: doorDashSales)
+- `actualCashClosing` -> `actualClosingCash` (deprecated)
+- `doordashSales` -> `doorDashSales` (preferred: `doorDashSales`)
+- `kibo-north` -> `st-clair` (deprecated alias)
+- `kibo-south` -> `woodbridge` (deprecated alias)
 
 권장:
 
@@ -1060,7 +1085,7 @@ src/
 
 Kibo Dashboard API 구조는 다음 핵심 목적을 기반으로 설계되었다.
 
-- 매출 데이터 관리
+- St. Clair / Woodbridge 매출 데이터 관리
 - Holiday 기반 비교 분석
 - 현금 흐름 분석
 - 관리자 수정 이력 추적

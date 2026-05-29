@@ -23,8 +23,8 @@ const NET_RATIO = 0.85
 const BASE_START_DATE = '2026-01-01'
 
 const stores: StoreOption[] = [
-  { id: 'store-kibo-north', key: 'kibo-north', name: 'Kibo Sushi North', code: 'KB-N01' },
-  { id: 'store-kibo-south', key: 'kibo-south', name: 'Kibo Sushi South', code: 'KB-S01' },
+  { id: 'store-st-clair', key: 'st-clair', name: 'St. Clair', code: 'KB-STC' },
+  { id: 'store-woodbridge', key: 'woodbridge', name: 'Woodbridge', code: 'KB-WDB' },
 ]
 
 const holidaySalesMap: Array<HolidayListItem & { salesByYear: Record<number, number> }> = [
@@ -38,8 +38,8 @@ const holidaySalesMap: Array<HolidayListItem & { salesByYear: Record<number, num
 ]
 
 const holidayFactors: Record<NonAggregateStoreKey, number> = {
-  'kibo-north': 1.08,
-  'kibo-south': 0.92,
+  'st-clair': 1.08,
+  'woodbridge': 0.92,
 }
 
 const salesOverrides = new Map<string, SaleRecord>()
@@ -93,8 +93,8 @@ function generateBaseSale(date: Date, storeKey: NonAggregateStoreKey): SaleRecor
   const dayOfWeek = date.getDay()
   const dateNum = date.getDate()
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-  const storeSeed = storeKey === 'kibo-north' ? 17 : 31
-  const storeFactor = storeKey === 'kibo-north' ? 1.06 : 0.94
+  const storeSeed = storeKey === 'st-clair' ? 17 : 31
+  const storeFactor = storeKey === 'st-clair' ? 1.06 : 0.94
   const seed = (dateNum * 137 + dayOfWeek * 41 + storeSeed + date.getMonth() * 23) % 100
   const baseTotal = Math.round((12500 + seed * 90) * (isWeekend ? 1.22 : 1.0) * storeFactor)
 
@@ -133,7 +133,7 @@ function aggregateSales(date: string, entries: SaleRecord[]): SaleRecord {
 
   return {
     id: `all-${date}`,
-    storeKey: 'kibo-north',
+    storeKey: 'st-clair',
     salesDate: date,
     cardSales: entries.reduce((sum, entry) => sum + entry.cardSales, 0),
     cashSales,
@@ -166,7 +166,7 @@ function getStoreEntriesForRange(storeKey: StoreKey, startDate: Date, endDate: D
   const dates = getDateRange(startDate, endDate)
   if (storeKey === 'all') {
     return dates.map((date) =>
-      aggregateSales(toDateKey(date), [getResolvedSale(date, 'kibo-north'), getResolvedSale(date, 'kibo-south')])
+      aggregateSales(toDateKey(date), [getResolvedSale(date, 'st-clair'), getResolvedSale(date, 'woodbridge')])
     )
   }
 
@@ -412,7 +412,7 @@ export function getHolidayComparison(params: {
     const baseSales = holiday.salesByYear[year]
     let sales = baseSales
     if (params.storeKey === 'all') {
-      sales = Math.round(baseSales * holidayFactors['kibo-north']) + Math.round(baseSales * holidayFactors['kibo-south'])
+      sales = Math.round(baseSales * holidayFactors['st-clair']) + Math.round(baseSales * holidayFactors['woodbridge'])
     } else {
       sales = Math.round(baseSales * holidayFactors[params.storeKey])
     }
@@ -422,7 +422,7 @@ export function getHolidayComparison(params: {
     let previousSales: number | null = null
     if (previousBase !== undefined) {
       previousSales = params.storeKey === 'all'
-        ? Math.round(previousBase * holidayFactors['kibo-north']) + Math.round(previousBase * holidayFactors['kibo-south'])
+        ? Math.round(previousBase * holidayFactors['st-clair']) + Math.round(previousBase * holidayFactors['woodbridge'])
         : Math.round(previousBase * holidayFactors[params.storeKey])
     }
 
@@ -457,7 +457,7 @@ export function createAIReport(params: {
   endDate: string
   analysisType: 'weekly' | 'monthly' | 'holiday' | 'cash_flow'
 }): AIReport {
-  const label = params.storeKey === 'all' ? '전체 지점' : params.storeKey === 'kibo-north' ? 'North 지점' : 'South 지점'
+  const label = params.storeKey === 'all' ? '전체 지점' : params.storeKey === 'st-clair' ? 'St. Clair 지점' : 'Woodbridge 지점'
   const summary = `${label} 기준 ${params.analysisType} 분석 리포트입니다.\n\n• 기간: ${params.startDate} ~ ${params.endDate}\n• 총매출은 직전 비교 기간 대비 안정적인 상승 흐름을 보였습니다.\n• 카드 결제 비중이 가장 높고, 현금 차액은 관리 가능한 수준입니다.\n• Holiday/배달 채널 영향이 동반된 구간은 별도 마케팅 액션 후보입니다.`
 
   return {

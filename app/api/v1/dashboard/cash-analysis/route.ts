@@ -3,7 +3,7 @@ import { getCashAnalysis } from '@/lib/mock-data'
 import type { StoreKey } from '@/lib/types'
 
 function getStoreKey(value: string | null): StoreKey {
-  if (value === 'kibo-north' || value === 'kibo-south' || value === 'all') return value
+  if (value === 'st-clair' || value === 'woodbridge' || value === 'all') return value
   return 'all'
 }
 
