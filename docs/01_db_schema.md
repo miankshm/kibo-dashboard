@@ -1,45 +1,68 @@
 # 01_db_schema.md
 
-# Kibo Dashboard - Database Schema Design
+# Kibo Dashboard - Database Schema Design (UI 동기화 반영본)
 
 ## 1. Database Design Overview
 
 Kibo Dashboard는 AI 기반 통합 매출 관리 및 홀리데이 분석 시스템이다.
 
-본 문서는 사용자가 제공한 요구사항만을 100% 기반으로 작성된 DB 설계 문서이며,
-다음 핵심 기능을 지원하기 위한 데이터 구조를 정의한다.
+본 문서는 최신 프론트엔드 명세([docs/03_frontend_ui.md](docs/03_frontend_ui.md))와 API 계약([docs/02_api_routes.md](docs/02_api_routes.md))을 기준으로 DB 설계를 정합성 있게 재정의한다.
+
+핵심 목표:
 
 - 다중 관리자 계정 관리
 - 다중 매장(Store) 관리
-- 일일 매출 입력 및 조회
-- Holiday 기반 매출 비교 분석
-- Audit Log 기반 수정 이력 추적
+- 일일 매출 입력/조회/수정 추적
+- Holiday 기반 연도 비교 분석
+- Audit Log 기반 이력 추적
 - Bulk Upload 지원
-- 향후 AI 분석 및 Weather API 확장성 확보
+- AI 분석 및 Weather 확장성 확보
 
 ---
 
-# 2. Database Architecture
+## 2. Database Architecture
 
-## 권장 데이터베이스
+### 권장 데이터베이스
 
 - PostgreSQL
 
-## 권장 ORM
+### 권장 ORM
 
 - Prisma ORM
-또는
 - TypeORM
 
 ---
 
-# 3. Core Entity Relationship
+## 3. Naming and Contract Rules
+
+### 3.1. 네이밍 규칙
+
+- DB 컬럼: snake_case
+- API 필드: camelCase
+- 프론트엔드 폼/상태: camelCase
+
+### 3.2. 핵심 필드 정합성 규칙
+
+- 프론트/API의 actualClosingCash는 DB의 actual_closing_cash로 매핑한다.
+- 프론트/API의 doorDashSales는 DB의 doordash_sales로 매핑한다.
+- 프론트 storeKey(kibo-north, kibo-south)는 DB stores.key로 관리하고, 내부 조인/무결성은 stores.id(UUID)로 처리한다.
+
+### 3.3. 이전 문서 대비 변경 포인트
+
+- sales.actual_cash_closing 명칭은 actual_closing_cash로 표준화
+- stores.key(슬러그) 필드 추가
+- 금액 필드 음수 방지 CHECK 제약 명시
+- 프론트 입력 계약 기준 매핑 표 추가
+
+---
+
+## 4. Core Entity Relationship
 
 ```text
 Admins
  ├── AdminInvitations
  ├── AuditLogs
- └── Sales
+ └── Sales (created_by / updated_by)
 
 Stores
  └── Sales
@@ -48,7 +71,7 @@ EventMasters
  └── Events
 
 Events
- └── Sales (날짜 기준 연결)
+ └── Sales (날짜 기준 분석 연결)
 
 Sales
  ├── AuditLogs
@@ -57,20 +80,19 @@ Sales
 
 ---
 
-# 4. Table Definitions
+## 5. Table Definitions
 
-# 4.1 admins
+## 5.1 admins
 
 관리자 계정 테이블
 
-## 목적
+### 목적
 
-- 관리자 로그인
-- 인증 처리
+- 로그인/인증 처리
 - 관리자 식별
-- 수정 이력 기록 연결
+- 수정 이력 연결
 
-## Schema
+### Schema
 
 ```sql
 CREATE TABLE admins (
@@ -94,30 +116,13 @@ CREATE TABLE admins (
 );
 ```
 
-## 주요 필드 설명
-
-| Field | Description |
-|---|---|
-| id | 관리자 고유 ID |
-| name | 관리자 이름 |
-| email | 로그인 이메일 |
-| password_hash | 암호화된 비밀번호 |
-| invited_by | 초대한 관리자 |
-| is_active | 계정 활성화 여부 |
-
 ---
 
-# 4.2 admin_invitations
+## 5.2 admin_invitations
 
-관리자 이메일 초대 관리 테이블
+관리자 이메일 초대 관리
 
-## 목적
-
-- 이메일 초대 링크 관리
-- 신규 관리자 가입 처리
-- 초대 만료 관리
-
-## Schema
+### Schema
 
 ```sql
 CREATE TABLE admin_invitations (
@@ -137,33 +142,25 @@ CREATE TABLE admin_invitations (
 );
 ```
 
-## 핵심 로직
-
-```text
-기존 관리자
-→ 이메일 초대 발송
-→ 토큰 생성
-→ 신규 관리자 비밀번호 설정
-→ 계정 생성 완료
-```
-
 ---
 
-# 4.3 stores
+## 5.3 stores
 
-매장(지점) 정보 테이블
+매장 정보 테이블
 
-## 목적
+### 목적
 
 - 다중 지점 관리
 - 대시보드 필터 기준
-- 매출 데이터 연결
+- 프론트 storeKey와 내부 UUID 연결
 
-## Schema
+### Schema
 
 ```sql
 CREATE TABLE stores (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    key VARCHAR(50) UNIQUE NOT NULL,
 
     name VARCHAR(100) NOT NULL,
 
@@ -183,27 +180,29 @@ CREATE TABLE stores (
 );
 ```
 
-## 예시 데이터
+### key 예시
 
-| name |
-|---|
-| North York |
-| Downtown |
+- kibo-north
+- kibo-south
+
+참고:
+
+- all은 집계 전용 가상 범위이며 stores 테이블에는 저장하지 않는다.
 
 ---
 
-# 4.4 sales
+## 5.4 sales
 
 핵심 매출 데이터 테이블
 
-## 목적
+### 목적
 
 - 일일 매출 저장
 - 현금 분석
 - Holiday 분석
 - AI 분석 데이터 제공
 
-## Schema
+### Schema
 
 ```sql
 CREATE TABLE sales (
@@ -227,15 +226,15 @@ CREATE TABLE sales (
 
     cash_and_carry_sales NUMERIC(12,2) DEFAULT 0,
 
-    actual_cash_closing NUMERIC(12,2) DEFAULT 0,
+    actual_closing_cash NUMERIC(12,2) DEFAULT 0,
 
     expected_cash_amount NUMERIC(12,2) DEFAULT 0,
 
     cash_difference NUMERIC(12,2) DEFAULT 0,
 
-    total_sales NUMERIC(12,2),
+    total_sales NUMERIC(12,2) DEFAULT 0,
 
-    net_sales NUMERIC(12,2),
+    net_sales NUMERIC(12,2) DEFAULT 0,
 
     note TEXT,
 
@@ -247,62 +246,34 @@ CREATE TABLE sales (
 
     updated_at TIMESTAMP DEFAULT NOW(),
 
-    UNIQUE(store_id, sales_date)
+    UNIQUE(store_id, sales_date),
+
+    CHECK (card_sales >= 0),
+    CHECK (card_tip >= 0),
+    CHECK (cash_sales >= 0),
+    CHECK (uber_eats_sales >= 0),
+    CHECK (doordash_sales >= 0),
+    CHECK (cash_and_carry_sales >= 0),
+    CHECK (actual_closing_cash >= 0)
 );
 ```
 
----
-
-## 매출 필드 설명
-
-| Field | Description |
-|---|---|
-| card_sales | 카드 결제 금액 |
-| card_tip | 카드 팁 |
-| cash_sales | 현금 매출 |
-| uber_eats_sales | Uber Eats 매출 |
-| doordash_sales | DoorDash 매출 |
-| cash_and_carry_sales | 캐시앤캐리 매출 |
-| actual_cash_closing | 실제 마감 현금 |
-
----
-
-## 핵심 계산 로직
-
-### total_sales
+### 핵심 계산 로직
 
 ```text
-총매출 =
-카드 + 현금 + Uber Eats + DoorDash + Cash & Carry
+total_sales = card_sales + cash_sales + uber_eats_sales + doordash_sales + cash_and_carry_sales
+net_sales = total_sales - (정책 기반 공제값)
+expected_cash_amount = cash_sales (또는 운영정책 기반 계산식)
+cash_difference = actual_closing_cash - expected_cash_amount
 ```
 
 ---
 
-### cash_difference
-
-```text
-현금 차액 =
-실제 마감 현금 - 예상 현금
-```
-
----
-
-# 4.5 event_masters
+## 5.5 event_masters
 
 Holiday 이름 기준 그룹 테이블
 
-## 목적
-
-유동적인 날짜를 가지는 Holiday를 동일 그룹으로 관리하기 위함.
-
-예:
-
-- Victoria Day 2024
-- Victoria Day 2025
-
-를 모두 동일 Holiday 그룹으로 묶는다.
-
-## Schema
+### Schema
 
 ```sql
 CREATE TABLE event_masters (
@@ -318,26 +289,13 @@ CREATE TABLE event_masters (
 );
 ```
 
-## 예시 데이터
-
-| name |
-|---|
-| Victoria Day |
-| Canada Day |
-| Labour Day |
-| Christmas |
-
 ---
 
-# 4.6 events
+## 5.6 events
 
 연도별 Holiday 날짜 테이블
 
-## 목적
-
-Holiday 실제 날짜 저장
-
-## Schema
+### Schema
 
 ```sql
 CREATE TABLE events (
@@ -349,55 +307,19 @@ CREATE TABLE events (
 
     year INTEGER NOT NULL,
 
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    UNIQUE(event_master_id, year)
 );
 ```
 
 ---
 
-## 예시 데이터
-
-| Holiday | Date |
-|---|---|
-| Victoria Day | 2024-05-20 |
-| Victoria Day | 2025-05-19 |
-
----
-
-## 핵심 분석 로직
-
-```text
-Holiday 선택
-→ EventMaster 조회
-→ 연도별 Event 조회
-→ 해당 날짜 Sales 조회
-→ 연도별 비교 분석
-```
-
----
-
-# 4.7 audit_logs
+## 5.7 audit_logs
 
 수정 이력 추적 테이블
 
-## 목적
-
-Locking 없이 상시 수정 가능하도록 하되,
-모든 수정 이력을 추적하기 위함.
-
-## 필수 요구사항
-
-반드시 기록해야 함:
-
-- 수정 전 값
-- 수정 후 값
-- 수정자
-- 수정 시간
-- 수정 사유
-
----
-
-## Schema
+### Schema
 
 ```sql
 CREATE TABLE audit_logs (
@@ -421,25 +343,21 @@ CREATE TABLE audit_logs (
 );
 ```
 
+필수 기록:
+
+- 수정 전 값
+- 수정 후 값
+- 수정자
+- 수정 시간
+- 수정 사유
+
 ---
 
-## 예시 데이터
-
-| field_name | old_value | new_value |
-|---|---|---|
-| cash_sales | 500 | 650 |
-
----
-
-# 4.8 bulk_upload_histories
+## 5.8 bulk_upload_histories
 
 엑셀 업로드 기록 테이블
 
-## 목적
-
-기존 엑셀 데이터를 일괄 업로드하기 위한 기록 관리
-
-## Schema
+### Schema
 
 ```sql
 CREATE TABLE bulk_upload_histories (
@@ -465,25 +383,11 @@ CREATE TABLE bulk_upload_histories (
 
 ---
 
-## upload_status 예시
-
-```text
-PROCESSING
-COMPLETED
-FAILED
-```
-
----
-
-# 4.9 ai_analysis_reports
+## 5.9 ai_analysis_reports
 
 AI 분석 결과 저장 테이블
 
-## 목적
-
-GPT 기반 매출 인사이트 저장
-
-## Schema
+### Schema
 
 ```sql
 CREATE TABLE ai_analysis_reports (
@@ -509,28 +413,20 @@ CREATE TABLE ai_analysis_reports (
 );
 ```
 
----
+report_type 예시:
 
-## report_type 예시
-
-| Type |
-|---|
-| WEEKLY |
-| MONTHLY |
-| HOLIDAY |
-| CASH_FLOW |
+- WEEKLY
+- MONTHLY
+- HOLIDAY
+- CASH_FLOW
 
 ---
 
-# 4.10 weather_snapshots (Future Extension)
+## 5.10 weather_snapshots (Future Extension)
 
-향후 Weather API 연동 대비 테이블
+날씨-매출 상관 분석 확장 대비
 
-## 목적
-
-날씨와 매출 상관관계 분석 확장 대비
-
-## Schema
+### Schema
 
 ```sql
 CREATE TABLE weather_snapshots (
@@ -550,84 +446,96 @@ CREATE TABLE weather_snapshots (
 
 ---
 
-# 5. Recommended Indexes
+## 6. Frontend/API/DB Field Mapping
 
-## 매출 조회 최적화
+| Frontend Field | API Field | DB Column |
+|---|---|---|
+| storeId (선택값) | storeKey 또는 storeId | stores.key / stores.id |
+| date | salesDate | sales_date |
+| cardSales | cardSales | card_sales |
+| cashSales | cashSales | cash_sales |
+| uberEatsSales | uberEatsSales | uber_eats_sales |
+| doorDashSales | doorDashSales | doordash_sales |
+| cashAndCarrySales | cashAndCarrySales | cash_and_carry_sales |
+| tips | tips 또는 cardTip 정책 매핑 | card_tip |
+| actualClosingCash | actualClosingCash | actual_closing_cash |
+
+정책 메모:
+
+- 프론트의 tips를 card_tip으로 저장할지 별도 컬럼으로 분리할지는 운영정책에 따르되, API 문서에서 명시적으로 고정한다.
+
+---
+
+## 7. Recommended Indexes
 
 ```sql
+CREATE INDEX idx_stores_key
+ON stores(key);
+
 CREATE INDEX idx_sales_store_date
 ON sales(store_id, sales_date);
-```
 
----
+CREATE INDEX idx_sales_date
+ON sales(sales_date);
 
-## Holiday 조회 최적화
-
-```sql
 CREATE INDEX idx_events_master_date
 ON events(event_master_id, event_date);
-```
 
----
-
-## Audit 조회 최적화
-
-```sql
 CREATE INDEX idx_audit_logs_record
 ON audit_logs(record_id);
 ```
 
 ---
 
-# 6. Data Flow Design
+## 8. Data Flow Design
 
-# 매출 입력 흐름
+### 8.1 매출 입력 흐름
 
 ```text
 관리자 입력
 → Validation
-→ Sales 저장
+→ stores.key/storeId 해석
+→ Sales upsert(UNIQUE store_id+sales_date)
 → Audit Log 생성
-→ Dashboard 반영
-→ AI 분석 가능 상태 저장
+→ Dashboard 집계 반영
+→ AI 분석 대상 데이터 준비
 ```
 
----
-
-# Holiday 분석 흐름
+### 8.2 Holiday 분석 흐름
 
 ```text
 Holiday 선택
 → EventMaster 조회
 → 연도별 Event 조회
-→ Sales 연결
-→ 비교 데이터 생성
+→ 해당 일자 Sales 집계
+→ 연도별 비교 데이터 생성
 → Dashboard 시각화
+```
+
+### 8.3 현금 분석 흐름
+
+```text
+기간(14일) 선택
+→ sales.cash_sales, sales.actual_closing_cash 집계
+→ expected_cash_amount, cash_difference 계산
+→ 전 기간 대비 증감 계산
 ```
 
 ---
 
-# 7. Security Considerations
-
-## 인증 관련
+## 9. Security Considerations
 
 - JWT 인증 권장
 - bcrypt password hashing 권장
-- Refresh Token 권장
-
----
-
-## 데이터 보호
-
 - SQL Injection 방지
+- 관리자 인증 미들웨어 적용
 - Audit Logging 필수
-- 관리자 인증 Middleware 적용
 
 ---
 
-# 8. Scalability Considerations
+## 10. Scalability Considerations
 
-## 향후 확장 가능 요소
+확장 가능 요소:
 
 - Weather API
 - POS 연동
@@ -639,15 +547,28 @@ Holiday 선택
 
 ---
 
-# 9. Final Database Summary
+## 11. Migration Notes
 
-Kibo Dashboard DB 구조는 다음 목표를 기반으로 설계되었다.
+기존 스키마에 actual_cash_closing 컬럼을 사용 중이면 다음 중 하나를 선택:
 
-- 매출 데이터의 안정적 저장
-- Holiday 중심 분석
+- 권장: actual_closing_cash로 컬럼 rename
+- 대안: actual_cash_closing 유지 + API/ORM 레벨 alias 매핑
+
+중요:
+
+- 문서/코드/DB 중 하나라도 명칭이 다르면 현금 분석 및 폼 저장 로직에서 장애가 발생할 수 있다.
+
+---
+
+## 12. Final Database Summary
+
+본 DB 설계는 최신 UI/UX 문서와 API 계약을 함께 반영한 기준안이다.
+
+핵심 보장 항목:
+
+- 매출 데이터 안정 저장
+- Holiday 중심 비교 분석
 - 현금 흐름 추적
 - 관리자 수정 이력 추적
 - AI 분석 확장성 확보
-- 향후 외부 API 연동 가능 구조 유지
-
-본 설계는 사용자가 제공한 요구사항만을 기반으로 작성된 DB 중심 설계 문서이다.
+- 외부 API 연동 가능 구조 유지
