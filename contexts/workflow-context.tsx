@@ -1,8 +1,10 @@
 'use client'
 
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import type { StoreId } from '@/store/useStore'
 import { useStore } from '@/store/useStore'
+import { analyzeAIReport } from '@/lib/api/ai'
+import { getSalesList, upsertDailySales } from '@/lib/api/sales'
 
 // 데이터 입력 폼 상태
 export interface DailySalesFormData {
@@ -54,7 +56,8 @@ interface WorkflowContextType {
   setDailySalesFormData: (data: Partial<DailySalesFormData>) => void
   resetDailySalesFormData: () => void
   dailySalesEntries: DailySalesEntry[]
-  recordDailySalesEntry: (data: DailySalesFormData & { storeId: StoreId }) => void
+  recordDailySalesEntry: (data: DailySalesFormData & { storeId: StoreId }) => Promise<void>
+  dataVersion: number
 
   // AI 분석 상태
   aiAnalysis: AIAnalysisState
@@ -106,6 +109,8 @@ const initialLoadingState: LoadingState = {
 const WorkflowContext = createContext<WorkflowContextType | undefined>(undefined)
 
 export function WorkflowProvider({ children }: { children: ReactNode }) {
+  const selectedStoreId = useStore((state) => state.selectedStoreId)
+  const language = useStore((state) => state.language)
   const [drawerState, setDrawerState] = useState<DrawerState>(initialDrawerState)
   const [dailySalesFormData, setDailySalesFormDataState] = useState<DailySalesFormData>(initialDailySalesFormData)
   const [dailySalesEntries, setDailySalesEntries] = useState<DailySalesEntry[]>([])
@@ -113,6 +118,7 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
   const [loadingState, setLoadingStateInternal] = useState<LoadingState>(initialLoadingState)
   const [showGrossSales, setShowGrossSales] = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily')
+  const [dataVersion, setDataVersion] = useState(0)
 
   const openDrawer = useCallback((drawer: keyof DrawerState) => {
     setDrawerState((prev) => ({ ...prev, [drawer]: true }))
@@ -134,68 +140,74 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
     setDailySalesFormDataState(initialDailySalesFormData)
   }, [])
 
-  const recordDailySalesEntry = useCallback((data: DailySalesFormData & { storeId: StoreId }) => {
-    if (!data.date) return
+  const recordDailySalesEntry = useCallback(async (data: DailySalesFormData & { storeId: StoreId }) => {
+    if (!data.date || data.storeId === 'all') return
 
-    const entryDate = data.date.toISOString().split('T')[0]
-    const entryId = `${data.storeId}-${entryDate}`
+    const savedRecord = await upsertDailySales({
+      storeKey: data.storeId,
+      salesDate: data.date.toISOString().split('T')[0],
+      cardSales: data.cardSales,
+      cashSales: data.cashSales,
+      uberEatsSales: data.uberEatsSales,
+      doorDashSales: data.doorDashSales,
+      cashAndCarrySales: data.cashAndCarrySales,
+      tips: data.tips,
+      actualClosingCash: data.actualClosingCash,
+    })
+
+    const nextEntry: DailySalesEntry = {
+      id: savedRecord.id,
+      storeId: data.storeId,
+      date: new Date(`${savedRecord.salesDate}T00:00:00`),
+      cardSales: savedRecord.cardSales,
+      cashSales: savedRecord.cashSales,
+      uberEatsSales: savedRecord.uberEatsSales,
+      doorDashSales: savedRecord.doorDashSales,
+      cashAndCarrySales: savedRecord.cashAndCarrySales,
+      tips: savedRecord.tips,
+      actualClosingCash: savedRecord.actualClosingCash,
+    }
 
     setDailySalesEntries((prev) => {
-      const filtered = prev.filter((entry) => entry.id !== entryId)
-      return [...filtered, { ...data, id: entryId }].sort(
+      const filtered = prev.filter((entry) => entry.id !== nextEntry.id)
+      return [...filtered, nextEntry].sort(
         (left, right) => left.date!.getTime() - right.date!.getTime()
       )
     })
+    setDataVersion((prev) => prev + 1)
   }, [])
 
   const generateAIReport = useCallback(async () => {
-    const language = useStore.getState().language
     setAIAnalysis((prev) => ({ ...prev, isLoading: true }))
-    
-    // Simulate AI API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
 
-    const mockReport =
-      language === 'ko'
-        ? `이번 주 매출 분석 리포트입니다.
+    try {
+      const endDate = new Date()
+      const startDate = new Date(endDate)
+      startDate.setDate(endDate.getDate() - 6)
 
-📊 주요 지표:
-• 총 매출: 전주 대비 12.5% 증가
-• 카드 결제: 65% (전주 대비 +3%)
-• 현금 결제: 20% (전주 대비 -2%)
-• 배달앱 매출: 15% (전주 대비 +5%)
+      const report = await analyzeAIReport({
+        storeKey: selectedStoreId,
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        analysisType: 'weekly',
+      })
 
-💡 인사이트:
-• 주말 저녁 시간대 매출이 가장 높았습니다.
-• Uber Eats 주문이 Door Dash 대비 30% 더 높은 성장률을 보였습니다.
-• 현금 사용 비율이 감소하는 추세입니다.
-
-🎯 추천 액션:
-• 배달앱 프로모션 강화를 고려해 보세요.
-• 주말 인력 배치 최적화가 필요합니다.`
-        : `This week's sales analysis report.
-
-📊 Key metrics:
-• Total sales: up 12.5% week over week
-• Card payments: 65% share (+3% WoW)
-• Cash payments: 20% share (-2% WoW)
-• Delivery sales: 15% share (+5% WoW)
-
-💡 Insights:
-• Weekend evening hours delivered the highest sales.
-• Uber Eats orders grew 30% faster than DoorDash.
-• Cash usage continues to trend downward.
-
-🎯 Recommended actions:
-• Consider strengthening delivery platform promotions.
-• Optimize staffing for weekend coverage.`
-
-    setAIAnalysis({
-      isLoading: false,
-      lastReport: mockReport,
-      reportGeneratedAt: new Date(),
-    })
-  }, [])
+      setAIAnalysis({
+        isLoading: false,
+        lastReport: report.summary,
+        reportGeneratedAt: new Date(report.generatedAt),
+      })
+    } catch {
+      setAIAnalysis({
+        isLoading: false,
+        lastReport:
+          language === 'ko'
+            ? 'AI 리포트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+            : 'Unable to load the AI report. Please try again shortly.',
+        reportGeneratedAt: new Date(),
+      })
+    }
+  }, [language, selectedStoreId])
 
   const clearAIReport = useCallback(() => {
     setAIAnalysis(initialAIAnalysis)
@@ -209,6 +221,52 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
     setShowGrossSales((prev) => !prev)
   }, [])
 
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadSalesEntries() {
+      try {
+        const endDate = new Date()
+        const startDate = new Date(endDate)
+        startDate.setDate(endDate.getDate() - 29)
+
+        const response = await getSalesList({
+          storeKey: selectedStoreId,
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0],
+          limit: 30,
+          sortOrder: 'asc',
+        })
+
+        if (!isMounted) return
+
+        setDailySalesEntries(
+          response.items.map((entry) => ({
+            id: entry.id,
+            storeId: selectedStoreId === 'all' ? 'all' : entry.storeKey,
+            date: new Date(`${entry.salesDate}T00:00:00`),
+            cardSales: entry.cardSales,
+            cashSales: entry.cashSales,
+            uberEatsSales: entry.uberEatsSales,
+            doorDashSales: entry.doorDashSales,
+            cashAndCarrySales: entry.cashAndCarrySales,
+            tips: entry.tips,
+            actualClosingCash: entry.actualClosingCash,
+          }))
+        )
+      } catch {
+        if (!isMounted) return
+        setDailySalesEntries([])
+      }
+    }
+
+    loadSalesEntries()
+
+    return () => {
+      isMounted = false
+    }
+  }, [selectedStoreId, dataVersion])
+
   return (
     <WorkflowContext.Provider
       value={{
@@ -221,6 +279,7 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
         resetDailySalesFormData,
         dailySalesEntries,
         recordDailySalesEntry,
+        dataVersion,
         aiAnalysis,
         generateAIReport,
         clearAIReport,

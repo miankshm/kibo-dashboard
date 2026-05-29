@@ -1,31 +1,51 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { UseEmblaCarouselType } from 'embla-carousel-react'
 import {
   BarElement,
-  Chart as ChartJS,
   CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  Legend,
+  LineElement,
   LinearScale,
   PointElement,
-  LineElement,
   Title,
   Tooltip,
-  Legend,
-  Filler,
 } from 'chart.js'
 import { Chart } from 'react-chartjs-2'
-import { TrendingUp, TrendingDown, CreditCard, Banknote, Truck, Store as StoreIcon } from 'lucide-react'
+import { Banknote, CreditCard, Store as StoreIcon, TrendingDown, TrendingUp, Truck } from 'lucide-react'
+import { getDashboardTrends } from '@/lib/api/dashboard'
+import { getSalesList } from '@/lib/api/sales'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Switch } from '@/components/ui/switch'
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel'
 import { useWorkflow } from '@/contexts/workflow-context'
-import { useStore } from '@/store/useStore'
 import { getTranslation } from '@/lib/i18n'
+import type { SaleRecord, SalesMode, TrendDataset } from '@/lib/types'
+import { useStore } from '@/store/useStore'
 
 type CarouselApi = UseEmblaCarouselType[1]
+
+interface SalesCardProps {
+  title: string
+  value: string
+  change: number
+  icon: React.ElementType
+}
+
+interface SalesSlide {
+  date: string
+  total: number
+  cards: Array<{
+    key: 'storeVisits' | 'cardSales' | 'cashSales' | 'deliverySales'
+    value: number
+    change: number
+  }>
+}
 
 ChartJS.register(
   BarElement,
@@ -39,54 +59,8 @@ ChartJS.register(
   Filler
 )
 
-// 앱 기준 오늘 날짜 (포트폴리오 mock)
-const TODAY = new Date(2026, 4, 17) // May 17, 2026
-
-// 날짜 기반 결정론적 mock 데이터 생성
-function generateDayData(date: Date, storeId: 'kibo-north' | 'kibo-south') {
-  const dayOfWeek = date.getDay()
-  const dateNum = date.getDate()
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-  const storeSeed = storeId === 'kibo-north' ? 17 : 31
-  const storeFactor = storeId === 'kibo-north' ? 1.06 : 0.92
-  const seed = (dateNum * 137 + dayOfWeek * 41 + storeSeed) % 100
-  const baseTotal = Math.round((16000 + seed * 80) * (isWeekend ? 1.3 : 1.0) * storeFactor)
-
-  return {
-    instore: { value: Math.round(baseTotal * 0.45), change: parseFloat(((seed % 25 - 10) / 2).toFixed(1)) },
-    card: { value: Math.round(baseTotal * 0.35), change: parseFloat(((seed % 30 - 8) / 2).toFixed(1)) },
-    cash: { value: Math.round(baseTotal * 0.15), change: parseFloat(((seed % 20 - 12) / 2).toFixed(1)) },
-    delivery: { value: Math.round(baseTotal * 0.20), change: parseFloat(((seed % 35 - 5) / 2).toFixed(1)) },
-    total: baseTotal,
-  }
-}
-
-function combineDayData(
-  northData: ReturnType<typeof generateDayData>,
-  southData: ReturnType<typeof generateDayData>
-) {
-  return {
-    instore: {
-      value: northData.instore.value + southData.instore.value,
-      change: parseFloat(((northData.instore.change + southData.instore.change) / 2).toFixed(1)),
-    },
-    card: {
-      value: northData.card.value + southData.card.value,
-      change: parseFloat(((northData.card.change + southData.card.change) / 2).toFixed(1)),
-    },
-    cash: {
-      value: northData.cash.value + southData.cash.value,
-      change: parseFloat(((northData.cash.change + southData.cash.change) / 2).toFixed(1)),
-    },
-    delivery: {
-      value: northData.delivery.value + southData.delivery.value,
-      change: parseFloat(((northData.delivery.change + southData.delivery.change) / 2).toFixed(1)),
-    },
-    total: northData.total + southData.total,
-  }
-}
-
-function formatDate(date: Date, language: 'ko' | 'en') {
+function formatDate(dateString: string, language: 'ko' | 'en') {
+  const date = new Date(`${dateString}T00:00:00`)
   return date.toLocaleDateString(language === 'ko' ? 'ko-KR' : 'en-US', {
     weekday: 'short',
     month: 'short',
@@ -95,27 +69,26 @@ function formatDate(date: Date, language: 'ko' | 'en') {
   })
 }
 
-// Mock 차트 데이터 (기존 유지)
-const mockSalesData = {
-  daily: {
-    labels: ['월', '화', '수', '목', '금', '토', '일'],
-    data: [2400, 2100, 2800, 3100, 3400, 4200, 3800],
-  },
-  weekly: {
-    labels: ['1주차', '2주차', '3주차', '4주차'],
-    data: [16800, 18200, 17500, 19100],
-  },
-  monthly: {
-    labels: ['1월', '2월', '3월', '4월', '5월', '6월'],
-    data: [72000, 68000, 75000, 82000, 78000, 85000],
-  },
+function getChange(dateString: string, offset: number) {
+  const date = new Date(`${dateString}T00:00:00`)
+  const raw = ((date.getDate() * 13 + date.getDay() * 7 + offset) % 26) - 10
+  return Number((raw / 2).toFixed(1))
 }
 
-interface SalesCardProps {
-  title: string
-  value: string
-  change: number
-  icon: React.ElementType
+function buildSlides(entries: SaleRecord[], salesMode: SalesMode): SalesSlide[] {
+  return entries.map((entry) => {
+    const total = salesMode === 'gross' ? entry.totalSales : entry.netSales
+    return {
+      date: entry.salesDate,
+      total,
+      cards: [
+        { key: 'storeVisits', value: Math.round(total * 0.45), change: getChange(entry.salesDate, 11) },
+        { key: 'cardSales', value: Math.round(total * 0.35), change: getChange(entry.salesDate, 17) },
+        { key: 'cashSales', value: Math.round(total * 0.15), change: getChange(entry.salesDate, 23) },
+        { key: 'deliverySales', value: Math.round(total * 0.2), change: getChange(entry.salesDate, 29) },
+      ],
+    }
+  })
 }
 
 function SalesCard({ title, value, change, icon: Icon }: SalesCardProps) {
@@ -139,66 +112,87 @@ function SalesCard({ title, value, change, icon: Icon }: SalesCardProps) {
 }
 
 export function SalesSummary() {
-  const { showGrossSales, toggleSalesMode, selectedPeriod, setSelectedPeriod, dailySalesFormData } = useWorkflow()
+  const { showGrossSales, toggleSalesMode, selectedPeriod, setSelectedPeriod, dataVersion } = useWorkflow()
   const { selectedStoreId, language } = useStore()
-  const { dailySalesEntries } = useWorkflow()
   const text = getTranslation(language)
-
-  const filteredEntries = useMemo(() => {
-    if (selectedStoreId === 'all') return dailySalesEntries
-    return dailySalesEntries.filter((entry) => entry.storeId === selectedStoreId)
-  }, [dailySalesEntries, selectedStoreId])
-
-  // 오늘 매출 입력 여부 확인
-  const hasTodaySales =
-    filteredEntries.some((entry) => entry.date && new Date(entry.date).toDateString() === TODAY.toDateString()) ||
-    (selectedStoreId !== 'all' &&
-      dailySalesFormData.date !== null &&
-      new Date(dailySalesFormData.date).toDateString() === TODAY.toDateString() &&
-      dailySalesFormData.storeId === selectedStoreId)
-
-  // 슬라이드 목록 생성: 7일 전 ~ 최근 접근 가능한 날짜
-  const slides = useMemo(() => {
-    const maxOffset = hasTodaySales ? 0 : 1 // 0=오늘, 1=어제
-    const result = []
-
-    const getScopedDayData = (date: Date) => {
-      if (selectedStoreId === 'all') {
-        const north = generateDayData(date, 'kibo-north')
-        const south = generateDayData(date, 'kibo-south')
-        return combineDayData(north, south)
-      }
-      return generateDayData(date, selectedStoreId)
-    }
-
-    for (let i = 7; i >= maxOffset; i--) {
-      const date = new Date(TODAY)
-      date.setDate(TODAY.getDate() - i)
-      result.push({ date, data: getScopedDayData(date) })
-    }
-    return result
-  }, [hasTodaySales, selectedStoreId])
-
   const [carouselApi, setCarouselApi] = useState<CarouselApi>()
-  const [currentIndex, setCurrentIndex] = useState(slides.length - 1)
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [slides, setSlides] = useState<SalesSlide[]>([])
+  const [trendLabels, setTrendLabels] = useState<string[]>([])
+  const [trendDatasets, setTrendDatasets] = useState<TrendDataset[]>([])
+  const [chartPeriodTotal, setChartPeriodTotal] = useState(0)
 
-  // API 연결 후 선택 이벤트 구독
   useEffect(() => {
     if (!carouselApi) return
+
     const onSelect = () => setCurrentIndex(carouselApi.selectedScrollSnap())
     carouselApi.on('select', onSelect)
-    return () => { carouselApi.off('select', onSelect) }
+    onSelect()
+
+    return () => {
+      carouselApi.off('select', onSelect)
+    }
   }, [carouselApi])
 
-  // hasTodaySales 변경 시 마지막 슬라이드로 리셋
   useEffect(() => {
-    setCurrentIndex(slides.length - 1)
-    carouselApi?.scrollTo(slides.length - 1, true)
-  }, [hasTodaySales, slides.length, carouselApi])
+    let isMounted = true
+
+    async function loadData() {
+      const endDate = new Date()
+      const startDate = new Date(endDate)
+      startDate.setDate(endDate.getDate() - 7)
+      const salesMode: SalesMode = showGrossSales ? 'gross' : 'net'
+
+      const [salesResponse, trendResponse] = await Promise.all([
+        getSalesList({
+          storeKey: selectedStoreId,
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0],
+          limit: 8,
+          sortOrder: 'asc',
+        }),
+        getDashboardTrends({
+          storeKey: selectedStoreId,
+          period: selectedPeriod,
+          salesMode,
+          language,
+        }),
+      ])
+
+      if (!isMounted) return
+
+      setSlides(buildSlides(salesResponse.items, salesMode))
+      setTrendLabels(trendResponse.labels)
+      setTrendDatasets(trendResponse.datasets)
+      setChartPeriodTotal(trendResponse.periodTotal)
+    }
+
+    loadData().catch(() => {
+      if (!isMounted) return
+      setSlides([])
+      setTrendLabels([])
+      setTrendDatasets([])
+      setChartPeriodTotal(0)
+    })
+
+    return () => {
+      isMounted = false
+    }
+  }, [dataVersion, language, selectedPeriod, selectedStoreId, showGrossSales])
+
+  useEffect(() => {
+    if (slides.length === 0) {
+      setCurrentIndex(0)
+      return
+    }
+
+    const nextIndex = slides.length - 1
+    setCurrentIndex(nextIndex)
+    carouselApi?.scrollTo(nextIndex, true)
+  }, [slides, carouselApi])
 
   const currentSlide = slides[currentIndex] ?? slides[slides.length - 1]
-  const dayData = currentSlide.data
-  const displayTotal = showGrossSales ? dayData.total : Math.round(dayData.total * 0.85)
+  const displayTotal = currentSlide?.total ?? 0
   const selectedPeriodLabel =
     selectedPeriod === 'daily'
       ? text.salesSummary.daily
@@ -206,52 +200,39 @@ export function SalesSummary() {
         ? text.salesSummary.weekly
         : text.salesSummary.monthly
 
-  const chartData = useMemo(() => {
-    const periodData = mockSalesData[selectedPeriod]
-    const scopedFactor = selectedStoreId === 'all' ? 2.0 : selectedStoreId === 'kibo-north' ? 1.06 : 0.94
-    const scopedValues = periodData.data.map((v) => Math.round(v * scopedFactor))
-    const values = showGrossSales ? scopedValues : scopedValues.map((v) => v * 0.85)
-    return {
-      labels: periodData.labels,
-      datasets: [
-        {
-          type: 'bar' as const,
-          label: showGrossSales ? text.salesSummary.gross : text.salesSummary.net,
-          data: values,
-          backgroundColor: 'oklch(0.527 0.154 150.069 / 0.18)',
-          borderColor: 'oklch(0.527 0.154 150.069 / 0.35)',
-          borderRadius: 10,
-          borderSkipped: false,
-          maxBarThickness: 42,
-        },
-        {
-          type: 'line' as const,
-          label: showGrossSales ? text.salesSummary.gross : text.salesSummary.net,
-          data: values,
-          borderColor: 'oklch(0.527 0.154 150.069)',
-          backgroundColor: 'oklch(0.527 0.154 150.069 / 0.22)',
-          fill: false,
-          tension: 0.4,
-          pointBackgroundColor: 'oklch(0.527 0.154 150.069)',
-          pointBorderColor: '#fff',
-          pointBorderWidth: 2,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          pointHoverBorderWidth: 2,
-          borderWidth: 3,
-          order: 0,
-        },
-      ],
-    }
-  }, [selectedPeriod, showGrossSales, selectedStoreId, text])
-
-  const chartPeriodTotal = useMemo(() => {
-    const periodData = mockSalesData[selectedPeriod]
-    const scopedFactor = selectedStoreId === 'all' ? 2.0 : selectedStoreId === 'kibo-north' ? 1.06 : 0.94
-    const scopedValues = periodData.data.map((v) => Math.round(v * scopedFactor))
-    const values = showGrossSales ? scopedValues : scopedValues.map((v) => v * 0.85)
-    return values.reduce((sum, value) => sum + value, 0)
-  }, [selectedPeriod, showGrossSales, selectedStoreId])
+  const trendValues = trendDatasets[0]?.data ?? []
+  const chartData = useMemo(() => ({
+    labels: trendLabels,
+    datasets: [
+      {
+        type: 'bar' as const,
+        label: showGrossSales ? text.salesSummary.gross : text.salesSummary.net,
+        data: trendValues,
+        backgroundColor: 'oklch(0.527 0.154 150.069 / 0.18)',
+        borderColor: 'oklch(0.527 0.154 150.069 / 0.35)',
+        borderRadius: 10,
+        borderSkipped: false,
+        maxBarThickness: 42,
+      },
+      {
+        type: 'line' as const,
+        label: showGrossSales ? text.salesSummary.gross : text.salesSummary.net,
+        data: trendValues,
+        borderColor: 'oklch(0.527 0.154 150.069)',
+        backgroundColor: 'oklch(0.527 0.154 150.069 / 0.22)',
+        fill: false,
+        tension: 0.4,
+        pointBackgroundColor: 'oklch(0.527 0.154 150.069)',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointHoverBorderWidth: 2,
+        borderWidth: 3,
+        order: 0,
+      },
+    ],
+  }), [showGrossSales, text, trendLabels, trendValues])
 
   const chartOptions = {
     responsive: true,
@@ -297,8 +278,8 @@ export function SalesSummary() {
               ${displayTotal.toLocaleString()}
             </span>
           </p>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {formatDate(currentSlide.date, language)}
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {currentSlide ? formatDate(currentSlide.date, language) : '-'}
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -315,53 +296,48 @@ export function SalesSummary() {
         </div>
       </div>
 
-      {/* Summary Cards Carousel */}
       <div className="relative px-10">
         <Carousel
           setApi={setCarouselApi}
-          opts={{ startIndex: slides.length - 1 }}
+          opts={{ startIndex: Math.max(slides.length - 1, 0) }}
         >
           <CarouselContent>
-            {slides.map(({ date, data }) => {
-              const slideTotal = showGrossSales ? data.total : Math.round(data.total * 0.85)
-              return (
-                <CarouselItem key={date.toISOString()}>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <SalesCard
-                      title={text.salesSummary.storeVisits}
-                      value={`$${Math.round(slideTotal * 0.45).toLocaleString()}`}
-                      change={data.instore.change}
-                      icon={StoreIcon}
-                    />
-                    <SalesCard
-                      title={text.salesSummary.cardSales}
-                      value={`$${Math.round(slideTotal * 0.35).toLocaleString()}`}
-                      change={data.card.change}
-                      icon={CreditCard}
-                    />
-                    <SalesCard
-                      title={text.salesSummary.cashSales}
-                      value={`$${Math.round(slideTotal * 0.15).toLocaleString()}`}
-                      change={data.cash.change}
-                      icon={Banknote}
-                    />
-                    <SalesCard
-                      title={text.salesSummary.deliverySales}
-                      value={`$${Math.round(slideTotal * 0.20).toLocaleString()}`}
-                      change={data.delivery.change}
-                      icon={Truck}
-                    />
-                  </div>
-                </CarouselItem>
-              )
-            })}
+            {slides.map((slide) => (
+              <CarouselItem key={slide.date}>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <SalesCard
+                    title={text.salesSummary.storeVisits}
+                    value={`$${slide.cards[0]?.value.toLocaleString() ?? '0'}`}
+                    change={slide.cards[0]?.change ?? 0}
+                    icon={StoreIcon}
+                  />
+                  <SalesCard
+                    title={text.salesSummary.cardSales}
+                    value={`$${slide.cards[1]?.value.toLocaleString() ?? '0'}`}
+                    change={slide.cards[1]?.change ?? 0}
+                    icon={CreditCard}
+                  />
+                  <SalesCard
+                    title={text.salesSummary.cashSales}
+                    value={`$${slide.cards[2]?.value.toLocaleString() ?? '0'}`}
+                    change={slide.cards[2]?.change ?? 0}
+                    icon={Banknote}
+                  />
+                  <SalesCard
+                    title={text.salesSummary.deliverySales}
+                    value={`$${slide.cards[3]?.value.toLocaleString() ?? '0'}`}
+                    change={slide.cards[3]?.change ?? 0}
+                    icon={Truck}
+                  />
+                </div>
+              </CarouselItem>
+            ))}
           </CarouselContent>
           <CarouselPrevious className="-left-10" />
           <CarouselNext className="-right-10" />
         </Carousel>
       </div>
 
-      {/* Chart Section */}
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -373,7 +349,7 @@ export function SalesSummary() {
                 </span>
               </CardDescription>
             </div>
-            <Tabs value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as 'daily' | 'weekly' | 'monthly')}>
+            <Tabs value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as 'daily' | 'weekly' | 'monthly')}>
               <TabsList>
                 <TabsTrigger value="daily">{text.salesSummary.daily}</TabsTrigger>
                 <TabsTrigger value="weekly">{text.salesSummary.weekly}</TabsTrigger>

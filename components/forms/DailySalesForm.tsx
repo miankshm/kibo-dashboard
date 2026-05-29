@@ -94,8 +94,7 @@ export function DailySalesForm() {
     setIsSubmitting(true)
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1500))
-    console.log('Daily sales data submitted:', { ...data, storeId: resolvedStoreId })
-    recordDailySalesEntry({ ...data, storeId: resolvedStoreId })
+    await recordDailySalesEntry({ ...data, storeId: resolvedStoreId })
     setIsSubmitting(false)
     form.reset()
     resetDailySalesFormData()
