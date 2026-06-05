@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDashboardSummary } from '@/lib/mock-data'
+import { getDashboardSummaryFromDb } from '@/lib/db-queries'
 import type { SalesMode, SalesPeriod, StoreKey } from '@/lib/types'
 
 function getStoreKey(value: string | null): StoreKey {
@@ -17,12 +17,17 @@ function getSalesMode(value: string | null): SalesMode {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const data = getDashboardSummary({
-    storeKey: getStoreKey(searchParams.get('storeKey')),
-    period: getPeriod(searchParams.get('period')),
-    salesMode: getSalesMode(searchParams.get('salesMode')),
-  })
+  try {
+    const { searchParams } = new URL(request.url)
+    const data = await getDashboardSummaryFromDb({
+      storeKey: getStoreKey(searchParams.get('storeKey')),
+      period: getPeriod(searchParams.get('period')),
+      salesMode: getSalesMode(searchParams.get('salesMode')),
+    })
 
-  return NextResponse.json({ success: true, data })
+    return NextResponse.json({ success: true, data })
+  } catch (error) {
+    console.error('Failed to fetch dashboard summary', error)
+    return NextResponse.json({ success: false, message: 'Failed to fetch dashboard summary' }, { status: 500 })
+  }
 }

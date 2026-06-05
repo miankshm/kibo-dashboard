@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getHolidayComparison } from '@/lib/mock-data'
+import { getHolidayComparisonFromDb } from '@/lib/db-queries'
 import type { HolidayRange, StoreKey } from '@/lib/types'
 
 function getStoreKey(value: string | null): StoreKey {
@@ -13,13 +13,27 @@ function getRange(value: string | null): HolidayRange {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const holidayId = searchParams.get('holidayId') ?? 'holiday-new-year'
-  const data = getHolidayComparison({
-    holidayId,
-    storeKey: getStoreKey(searchParams.get('storeKey')),
-    range: getRange(searchParams.get('range')),
-  })
+  try {
+    const { searchParams } = new URL(request.url)
+    const holidayId = searchParams.get('holidayId')
 
-  return NextResponse.json({ success: true, data })
+    if (!holidayId) {
+      return NextResponse.json({ success: false, message: 'holidayId is required' }, { status: 400 })
+    }
+
+    const data = await getHolidayComparisonFromDb({
+      holidayId,
+      storeKey: getStoreKey(searchParams.get('storeKey')),
+      range: getRange(searchParams.get('range')),
+    })
+
+    if (!data) {
+      return NextResponse.json({ success: false, message: 'Holiday not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, data })
+  } catch (error) {
+    console.error('Failed to fetch holiday comparison', error)
+    return NextResponse.json({ success: false, message: 'Failed to fetch holiday comparison' }, { status: 500 })
+  }
 }

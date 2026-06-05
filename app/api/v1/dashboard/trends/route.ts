@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDashboardTrends } from '@/lib/mock-data'
+import { getDashboardTrendsFromDb } from '@/lib/db-queries'
 import type { SalesMode, SalesPeriod, StoreKey } from '@/lib/types'
 
 function getStoreKey(value: string | null): StoreKey {
@@ -17,14 +17,19 @@ function getSalesMode(value: string | null): SalesMode {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const language = searchParams.get('language') === 'en' ? 'en' : 'ko'
-  const data = getDashboardTrends({
-    storeKey: getStoreKey(searchParams.get('storeKey')),
-    period: getPeriod(searchParams.get('period')),
-    salesMode: getSalesMode(searchParams.get('salesMode')),
-    language,
-  })
+  try {
+    const { searchParams } = new URL(request.url)
+    const language = searchParams.get('language') === 'en' ? 'en' : 'ko'
+    const data = await getDashboardTrendsFromDb({
+      storeKey: getStoreKey(searchParams.get('storeKey')),
+      period: getPeriod(searchParams.get('period')),
+      salesMode: getSalesMode(searchParams.get('salesMode')),
+      language,
+    })
 
-  return NextResponse.json({ success: true, data })
+    return NextResponse.json({ success: true, data })
+  } catch (error) {
+    console.error('Failed to fetch dashboard trends', error)
+    return NextResponse.json({ success: false, message: 'Failed to fetch dashboard trends' }, { status: 500 })
+  }
 }

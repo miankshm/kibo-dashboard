@@ -20,6 +20,14 @@ function formatCurrency(amount: number) {
   return `$${Math.abs(Math.round(amount)).toLocaleString()}`
 }
 
+function formatPercent(value: number | null | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return '0.0%'
+  }
+
+  return `${value.toFixed(1)}%`
+}
+
 function formatRange(startDate: string, endDate: string, language: 'ko' | 'en') {
   const locale = language === 'ko' ? 'ko-KR' : 'en-US'
   const start = new Date(`${startDate}T00:00:00`)
@@ -128,7 +136,7 @@ export function CashFlowAnalysis() {
                       </div>
                       <div className={`flex items-center gap-1 text-xs ${period.difference >= 0 ? 'text-success' : 'text-destructive'}`}>
                         {period.difference >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                        <span>{text.cashFlow.diffVsExpected} {period.differenceRate.toFixed(1)}%</span>
+                        <span>{text.cashFlow.diffVsExpected} {formatPercent(period.differenceRate)}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -144,7 +152,7 @@ export function CashFlowAnalysis() {
                       </div>
                       <div className={`flex items-center gap-1 text-xs ${period.vsPreviousAmount >= 0 ? 'text-success' : 'text-destructive'}`}>
                         {period.vsPreviousAmount >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                        <span>{period.vsPreviousRate.toFixed(1)}%</span>
+                        <span>{formatPercent(period.vsPreviousRate)}</span>
                       </div>
                     </CardContent>
                   </Card>

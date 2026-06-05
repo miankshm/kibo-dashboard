@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCashAnalysis } from '@/lib/mock-data'
+import { getCashAnalysisFromDb } from '@/lib/db-queries'
 import type { StoreKey } from '@/lib/types'
 
 function getStoreKey(value: string | null): StoreKey {
@@ -8,12 +8,17 @@ function getStoreKey(value: string | null): StoreKey {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const data = getCashAnalysis({
-    storeKey: getStoreKey(searchParams.get('storeKey')),
-    periodDays: Number(searchParams.get('periodDays') ?? '14'),
-    windowCount: Number(searchParams.get('windowCount') ?? '5'),
-  })
+  try {
+    const { searchParams } = new URL(request.url)
+    const data = await getCashAnalysisFromDb({
+      storeKey: getStoreKey(searchParams.get('storeKey')),
+      periodDays: Number(searchParams.get('periodDays') ?? '14'),
+      windowCount: Number(searchParams.get('windowCount') ?? '5'),
+    })
 
-  return NextResponse.json({ success: true, data })
+    return NextResponse.json({ success: true, data })
+  } catch (error) {
+    console.error('Failed to fetch cash analysis', error)
+    return NextResponse.json({ success: false, message: 'Failed to fetch cash analysis' }, { status: 500 })
+  }
 }
