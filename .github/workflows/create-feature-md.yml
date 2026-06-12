@@ -1,0 +1,63 @@
+name: Create Feature MD from Issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: read
+
+jobs:
+  create-feature-md:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate MD File Name and Structure
+        run: |
+          ISSUE_NUMBER=${{ github.event.issue.number }}
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          SAFE_TITLE=$(
+            printf '%s' "$ISSUE_TITLE" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+          )
+          FILENAME="docs/features/feature_${ISSUE_NUMBER}_${SAFE_TITLE}.md"
+          
+          mkdir -p docs/features
+          
+          echo "# [Feature #${ISSUE_NUMBER}] ${ISSUE_TITLE}" > "$FILENAME"
+          echo "" >> "$FILENAME"
+          echo "---" >> "$FILENAME"
+          echo "> 🤖 **Cursor Agent 작업 지시서 (System Prompt)**" >> "$FILENAME"
+          echo "> 너는 에이전시의 수석 개발자다. 주어진 마스터 문서(@01_db_schema.md, @02_api_routes.md, @03_frontend_ui.md)는 시스템 뼈대 파악을 위해 반드시 읽되, 절대 직접 수정하지 마라." >> "$FILENAME"
+          echo "> " >> "$FILENAME"
+          echo "> **[작업 3단계 프로세스 - 엄수할 것]**" >> "$FILENAME"
+          echo "> 1. **작업 중**: 이 Feature MD의 요구사항과 마스터 MD(참조용)를 보고 코드를 짠다. 스택은 [Next.js + Tailwind + Neon/Supabase Auth]로 고정한다." >> "$FILENAME"
+          echo "> 2. **작업 완료 직후**: 마스터 문서는 건드리지 말고, 이 Feature MD 하단 [반영된 최종 스펙]에 변경된 스펙만 요약 기록해라." >> "$FILENAME"
+          echo "> 3. **다음 작업 시작 전 (역동기화 준비)**: 개발자가 별도의 '역동기화 프롬프트'를 내리기 전까지 마스터 문서는 현재 상태를 유지한다." >> "$FILENAME"
+          echo "---" >> "$FILENAME"
+          echo "" >> "$FILENAME"
+          echo "## 1. 요구사항 명세 (Issue Content)" >> "$FILENAME"
+          echo "${{ github.event.issue.body }}" >> "$FILENAME"
+          echo "" >> "$FILENAME"
+          echo "## 2. 반영된 최종 스펙 (AI 작업 결과물)" >> "$FILENAME"
+          echo "<!-- 코드 작업이 끝나면 변경된 스펙(DB/API/UI)을 여기에 요약해. -->" >> "$FILENAME"
+          echo "" >> "$FILENAME"
+          echo "---" >> "$FILENAME"
+          echo "### ⚠️ 개발자 전용: 역동기화 프롬프트 템플릿 (복사해서 사용)" >> "$FILENAME"
+          echo "아래 프롬프트를 복사하여 새 채팅창에 입력하고 마스터 문서를 최신화하세요." >> "$FILENAME"
+          echo "\`\`\`text" >> "$FILENAME"
+          echo "@01_db_schema.md @02_api_routes.md @03_frontend_ui.md @(현재 작업한 코드 폴더/파일들)" >> "$FILENAME"
+          echo "현재 구현된 실제 소스 코드를 정답으로 간주하고, 변경된 사항을 바탕으로 마스터 MD 파일 3개를 최신화(덮어쓰기)해. 코드는 절대 수정하지 마." >> "$FILENAME"
+          echo "\`\`\`" >> "$FILENAME"
+          
+      - name: Commit and Push to Repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/features/*
+          git commit -m "docs: auto-generate strict feature MD for issue #${{ github.event.issue.number }}"
+          git push
