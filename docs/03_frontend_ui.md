@@ -1,275 +1,296 @@
-# 🎨 Kibo Dashboard 프론트엔드 UI/UX 아키텍처 및 구현 지시서 (구현 반영본)
+﻿# 03_frontend_ui.md
 
-본 문서는 Kibo Sushi 2개 지점의 통합 관리를 위한 Kibo Dashboard의 프론트엔드 및 UI/UX 구현 지시서입니다.
+# Kibo Dashboard 프론트엔드 UI/UX 아키텍처 및 구현 지시서 (실구현 Reverse-Sync 반영본)
 
-중요: 기본적으로 나열된 기본 사항들은 절대 변경 불가합니다.
+본 문서는 현재 코드 구현을 기준으로 프론트엔드 문서를 역동기화한 기준안이다.
 
-운영 지점 동기화 규칙:
-- 현재 운영 지점은 정확히 2개: St. Clair, Woodbridge
-- 전역 선택 값은 `all`, `st-clair`, `woodbridge`로 통일
-- 화면 표시명은 각각 All Stores, St. Clair, Woodbridge를 사용
-- DB/API 문서와 동일하게 `kibo-north`, `kibo-south`는 더 이상 현재 기준값으로 사용하지 않음
-
----
-
-## 1. 프론트엔드 기술 스택 및 디자인 시스템 (Tech Stack & Theme)
-
-- 코어 프레임워크: React (Next.js)
-- 글로벌 상태 관리: Zustand 기반 전역 상태
-- UI 라이브러리 및 컴포넌트: ShadCN UI (Tailwind CSS 기반)
-- 데이터 테이블 기준: ShadCN DataTable (TanStack Table) 지향
-- 폼 관리: ShadCN Form (React Hook Form + Zod)
-- 데이터 시각화: Chart.js + react-chartjs-2
-- 디자인 테마/컬러:
-- 기본 테마: Light/Dark 모드 지원
-- 포인트 컬러: Kibo Green 톤을 Primary/Accent 및 차트 핵심 컬러로 사용
-- 배경/텍스트: 가독성 중심의 Black/White/Gray 계열 유지
-
-구현 반영 메모:
-- 현재 차트 섹션/캐러셀 인터랙션을 위해 embla-carousel-react 사용
-- 날짜/로케일 표현에 date-fns 사용
-- 다국어(ko/en), 다크모드, 사이드바 상태를 Zustand에서 통합 제어
-- Store 관련 상태는 St. Clair / Woodbridge / All Stores 기준으로 동작
+중요 Store 규칙:
+- 운영 지점: St. Clair, Woodbridge
+- 전역 선택 값: `all`, `st-clair`, `woodbridge`
+- 화면 표시명: All Stores, St. Clair, Woodbridge (언어별 로컬라이즈 포함)
 
 ---
 
-## 2. 전체 레이아웃 아키텍처 (Layout Structure)
+## 1. 프론트엔드 기술 스택 및 디자인 시스템
 
-- 구조 방식: 한 화면 스크롤 구조 (Single Page Scroll)
-- 사이드바 (반응형):
-- 데스크탑: 좌측 고정형 사이드바
-- 모바일: 좌측 Sheet 슬라이드 아웃
-- 슬라이드 패널 (Right Drawer):
-- 데이터 입력 폼 및 AI 분석 위젯은 우측 Sheet로 오픈
-- 화면 전환 없이 컨텍스트 유지
+- 코어 프레임워크: Next.js App Router (`next@16`, `react@19`)
+- 전역 상태: Zustand (`store/useStore.ts`)
+- 워크플로우 상태: React Context (`contexts/workflow-context.tsx`)
+- UI 컴포넌트: ShadCN UI 계열 컴포넌트
+- 스타일링: Tailwind CSS v4 (`app/globals.css`)
+- 차트: Chart.js + react-chartjs-2
+- 캐러셀: embla-carousel-react
+- 폼: React Hook Form + Zod
+- 날짜 포맷: date-fns
+- 아이콘: lucide-react
 
-구현 반영 상세:
-- 상단 Header는 sticky 처리
-- Header 우측 액션: Store 선택, AI 오픈, 언어 전환, 다크모드 전환
-- 모바일에서는 우하단 Floating AI 버튼 제공
-- Store Selector의 실사용 옵션은 All Stores, St. Clair, Woodbridge 3개다
+테마/디자인 실제 반영:
+- `app/globals.css`에서 OKLCH 기반 커스텀 토큰 사용
+- Primary/Success를 Kibo Green 계열로 정의
+- Light/Dark 토큰 모두 정의, `ThemeProvider`가 `html.dark` class 토글
+- 폰트는 Geist/Geist Mono 사용 (`app/layout.tsx`)
+
+주의:
+- `styles/globals.css` 파일이 있으나 현재 `app/layout.tsx`에는 `app/globals.css`만 import되어 실제 적용은 `app/globals.css` 기준이다.
+
+---
+
+## 2. 전체 레이아웃 아키텍처
+
+- 라우팅: 현재 사용자 페이지는 `app/page.tsx` 단일 대시보드
+- 구조: 단일 스크롤 페이지 + 섹션 앵커 이동
+- 데스크탑:
+  - 좌측 고정 Sidebar (`lg:w-64`)
+  - Header sticky (`top-0`) + 본문
+- 모바일:
+  - Sidebar를 Sheet(왼쪽 슬라이드)로 오픈
+  - 우하단 Floating AI 버튼 제공
+- 우측 Drawer(Sheet):
+  - Daily Sales Form
+  - AI Widget
 
 ---
 
 ## 3. 핵심 UI 영역 및 컴포넌트 상세 명세
 
-### 3.1. 상단 글로벌 컨트롤 영역 (Header / Top Section)
+### 3.1 Header / 글로벌 컨트롤
 
-- Store 선택 영역:
-- Header 내 Dropdown 기반 Store Selector 제공
-- 전체 보기 / 지점별 전환 가능
-- 지점별 선택지는 St. Clair, Woodbridge
-- 전역 상태 변경 시 모든 대시보드 섹션 즉시 리렌더링
-- 추가 글로벌 컨트롤:
-- AI 위젯 오픈 아이콘 버튼
-- 언어 전환 버튼 (ko/en)
+구성 컴포넌트: `components/layout/Header.tsx`
+
+기능:
+- 모바일 메뉴 버튼 -> Sidebar Sheet 토글
+- Store Selector Dropdown
+- AI 위젯 오픈 버튼
+- 언어 토글 버튼 (ko/en)
 - 다크모드 토글 버튼
-- 모바일 메뉴 버튼 (사이드바 오픈)
 
-### 3.2. 매출 요약 영역 (Sales Summary)
+Store 선택값 변경은 Zustand 전역 상태(`selectedStoreId`)를 갱신하며, 하위 대시보드 섹션 데이터 재조회 트리거로 사용된다.
 
-- UI 구성:
-- 요약 카드 + 추이 차트
-- 최근 일자 카드 영역은 캐러셀 기반
-- 상세 데이터 포인트:
-- 카드 항목: 매장 방문, 카드 결제, 현금 결제, 배달앱(Uber+DoorDash)
-- 총매출(Gross) / 순매출(Net) 스위치 유지
-- 기간 선택: 일별 / 주별 / 월별 탭
-- 데이터 시각화:
-- Line Chart 필수 원칙 유지
-- 구현은 Bar + Line 혼합 오버레이 차트로 확장
-- Green 계열 라인/포인트 색상 사용
-- 동작 반영:
-- Store 범위(All Stores / St. Clair / Woodbridge)에 따라 차트 및 요약 값 스케일 반영
-- 일별 카드는 최근 7일 기준으로 스와이프 탐색 가능
+### 3.2 Sidebar
 
-### 3.3. 현금 유입 분석 영역 (Cash Flow Analysis)
+구성 컴포넌트: `components/layout/Sidebar.tsx`
 
-- UI 구성:
-- 14일(2주) 단위 요약 카드 + 상세 리스트
-- 최근 기간부터 탐색 가능한 캐러셀 구조
-- 계산 로직:
-- 예상 현금: `cashSales` 기반
-- 실제 현금: `actualClosingCash` 기반
-- 차액: `actualClosingCash - expectedCash`
-- 표시 항목:
-- 예상 현금, 실제 마감 현금, 차액, 전 2주 대비 증감
-- 양수/음수에 따라 Green/Red 시각 강조
-- 상세 리스트:
-- 일자별 예상/실제/차액 배지 표시
-- 차액 건수, 마이너스 건수 집계 문구 제공
-- 범위 동작:
-- All Stores는 St. Clair + Woodbridge 집계값
-- 단일 지점 선택 시 해당 지점만 표시
+네비게이션 앵커:
+- `#dashboard`
+- `#sales`
+- `#cashflow`
+- `#holiday`
+- Daily Sales 입력 액션(드로어 오픈)
+- `#settings` (현재 별도 섹션 구현 없음)
 
-### 3.4. 홀리데이 자동 조회 영역 (Holiday Comparison)
+### 3.3 Sales Summary
 
-- UI 구성:
-- 다가오는 홀리데이(1개월) 빠른 선택 버튼
-- 전체 홀리데이 Select 선택
-- 차트 기간 토글(작년/3년/5년)
-- 테이블 뷰:
-- 연도, 날짜, 매출, YoY 변화 컬럼 제공
-- YoY 상승/하락 아이콘 및 색상 처리
-- 차트 뷰:
-- Bar Chart 기반 연도별 비교 시각화
-- 바 상단 금액 라벨 표시
-- 구현 반영 주의:
-- 기본 지침의 DataTable 지향은 유지
-- 현재 구현은 ShadCN Table 기반으로 동일 정보/비교 기능 제공
-- Store 범위:
-- All Stores / St. Clair / Woodbridge 필터와 완전히 연동
-- Holiday 비교 응답의 `storeKey` 규격은 API 문서와 동일하게 `all`, `st-clair`, `woodbridge`
+구성 컴포넌트: `components/dashboard/SalesSummary.tsx`
 
-### 3.5. 데이터 입력 폼 (Data Entry Form)
+실동작:
+- 최근 8개 sales 항목을 캐러셀 카드로 표시
+- Gross/Net 스위치 (`showGrossSales`)
+- 기간 탭 (`daily|weekly|monthly`)
+- 차트는 Bar + Line 오버레이
 
-- 접근 방식:
-- 일일 매출 입력 버튼 클릭 시 우측 Drawer(Sheet) 오픈
-- UI 구성:
-- ShadCN Form 단독 사용
-- Validation:
-- Zod 기반 경량 검증
-- 필수 날짜 검증
-- 음수 금액 입력 방지
-- 입력 항목:
-- 지점 선택(전체 보기 상태에서만 필수 선택)
-- 지점 선택지는 St. Clair, Woodbridge
-- 기준일(Date picker)
-- Card
-- Cash
-- Uber Eats
-- DoorDash
-- Cash and Carry
-- Tips
-- Actual Closing Cash
-- 실시간 합산:
-- 결제/배달 항목 합계 기반 Total Sales 표시
-- 제출 동작:
-- 저장 로딩 후 entry 기록
-- 동일 지점+날짜 재입력 시 최신 값으로 갱신 저장
-- 계약 동기화:
-- 폼 제출 payload의 `storeKey`는 `st-clair` 또는 `woodbridge`만 허용
-- `all` 상태에서는 실제 저장 전 반드시 단일 지점 선택이 필요
+API 호출:
+- `GET /api/v1/sales`
+- `GET /api/v1/dashboard/trends`
 
-### 3.6. AI Agent Widget (매출 분석 비서)
+참고:
+- 카드 내 방문/카드/현금/배달 값은 실제 DB 원본 직접필드가 아니라 UI 계산값(총매출 기반 비율/변화 계산)으로 구성된다.
 
-- 접근 방식:
-- Header 아이콘 또는 모바일 Floating 버튼으로 우측 Drawer 오픈
-- UI 구성:
-- 생성 버튼 + 로딩 상태 + 리포트 본문 + 빠른 질문 버튼
-- UX 흐름:
-- 리포트 생성 클릭
-- 로딩 스피너/애니메이션 표시
-- 분석 텍스트 리포트 렌더링
-- 생성 시각 메타데이터 표시
-- 리포트 초기화 액션 제공
-- 현재 구현:
-- Mock AI 응답 흐름(비동기 지연) 기반 동작
-- 한국어/영어 리포트 내용 분기 지원
-- Store 범위:
-- All Stores, St. Clair, Woodbridge 현재 선택 상태를 기준으로 분석 요청
+### 3.4 Cash Flow Analysis
+
+구성 컴포넌트: `components/dashboard/CashFlowAnalysis.tsx`
+
+실동작:
+- 14일 단위 window를 5개(`PERIOD_COUNT=5`) 캐러셀로 표시
+- 예상/실제/차액/전기간 대비 카드 표시
+- 상세 리스트에서 날짜별 badge 표시
+
+API 호출:
+- `GET /api/v1/dashboard/cash-analysis?periodDays=14&windowCount=5`
+
+### 3.5 Holiday Comparison
+
+구성 컴포넌트: `components/dashboard/HolidayComparison.tsx`
+
+실동작:
+- 다가오는 홀리데이 버튼 + 전체 홀리데이 Select
+- 기간 토글: `1y|3y|5y`
+- Bar 차트 + 상단 값 라벨 플러그인
+- 연도별 표(Table) + YoY 상승/하락 아이콘
+
+API 호출:
+- `GET /api/v1/holidays`
+- `GET /api/v1/holidays/upcoming`
+- `GET /api/v1/holidays/comparison`
+
+### 3.6 Daily Sales Form (우측 Drawer)
+
+구성 컴포넌트: `components/forms/DailySalesForm.tsx`
+
+검증/동작:
+- Zod 스키마
+- 날짜 필수, 금액 음수 불가
+- `selectedStoreId === all`일 때만 store 선택 필드 노출
+- 저장 전 최종 store는 반드시 `st-clair|woodbridge`
+- 총합(`Total Sales`) 실시간 계산 표시
+
+제출 플로우:
+1. 1.5초 로딩 시뮬레이션
+2. Workflow의 `recordDailySalesEntry` 호출
+3. 내부에서 `POST /api/v1/sales` upsert
+4. 성공 시 폼 초기화 + Drawer 닫기
+
+### 3.7 AI Widget (우측 Drawer)
+
+구성 컴포넌트: `components/dashboard/AIWidget.tsx`
+
+실동작:
+- 리포트 생성 버튼
+- 로딩 애니메이션
+- 생성 시각 표시
+- 리포트 초기화 버튼
+- 빠른 질문 버튼(현재 동일 generate handler 재사용)
+
+API 호출:
+- `POST /api/v1/ai/analyze`
 
 ---
 
-## 4. 프론트엔드 폴더 구조 (현재 워크스페이스 기준)
+## 4. 프론트엔드 폴더 구조 (현재 구현 기준)
 
 ```text
 app/
-    layout.tsx
-    page.tsx
-    globals.css
+  layout.tsx
+  page.tsx
+  globals.css
+  api/v1/**/route.ts
 
 components/
-    layout/
-        Header.tsx
-        Sidebar.tsx
-        PageContainer.tsx
-    dashboard/
-        StoreSelector.tsx
-        SalesSummary.tsx
-        CashFlowAnalysis.tsx
-        HolidayComparison.tsx
-        AIWidget.tsx
-    forms/
-        DailySalesForm.tsx
-    providers/
-        ThemeProvider.tsx
-        LanguageSync.tsx
-    ui/
-        ...shadcn ui components
+  layout/
+    Header.tsx
+    Sidebar.tsx
+    PageContainer.tsx
+  dashboard/
+    StoreSelector.tsx
+    SalesSummary.tsx
+    CashFlowAnalysis.tsx
+    HolidayComparison.tsx
+    AIWidget.tsx
+  forms/
+    DailySalesForm.tsx
+  providers/
+    ThemeProvider.tsx
+    LanguageSync.tsx
+  ui/
+    shadcn 기반 공통 컴포넌트
 
 contexts/
-    workflow-context.tsx
+  workflow-context.tsx
 
 store/
-    useStore.ts
+  useStore.ts
 
 lib/
-    i18n.ts
-    utils.ts
+  i18n.ts
+  api/*.ts
+  db-queries.ts
+  schema.ts
+  types/*
 ```
 
 ---
 
-## 5. 상태 관리 및 워크플로우 명세 (구현 반영 추가)
+## 5. 상태 관리 및 워크플로우 명세
 
-- Zustand (앱 전역):
-- `selectedStoreId`
-- `isSidebarOpen`
-- `isDarkMode`
-- `language`
-- `selectedStoreId` 허용값은 `all`, `st-clair`, `woodbridge`
-- Workflow Context (화면 워크플로우):
-- `drawerState` (`dailySalesForm`, `aiWidget`)
-- `dailySalesEntries` 기록/갱신
-- `aiAnalysis` 상태 (`loading`, `lastReport`, `generatedAt`)
-- `showGrossSales` 토글
-- `selectedPeriod` (`daily` / `weekly` / `monthly`)
+## 5.1 Zustand 전역 상태 (`store/useStore.ts`)
 
-### Store 선택 워크플로우 규칙
+- `selectedStoreId`: `all|st-clair|woodbridge`
+- `isSidebarOpen`: 모바일 사이드바 열림 상태
+- `isDarkMode`: 다크모드 상태
+- `language`: `ko|en`
 
-```text
-1. 사용자는 Header Store Selector에서 All Stores / St. Clair / Woodbridge 중 하나를 선택한다
-2. 선택값은 Zustand 전역 상태에 반영된다
-3. Sales Summary, Cash Flow Analysis, Holiday Comparison, AI Widget이 동일한 store context를 사용한다
-4. Data Entry Form은 저장 시점에 반드시 단일 지점(storeKey: st-clair 또는 woodbridge)으로 귀결되어야 한다
-5. API 요청의 storeKey 규격은 docs/02_api_routes.md와 동일해야 한다
-```
+보조 상수:
+- `STORES`: 화면용 store 메타(로컬라이즈 텍스트)
+
+## 5.2 Workflow Context (`contexts/workflow-context.tsx`)
+
+- Drawer 상태: `dailySalesForm`, `aiWidget`
+- Daily Sales:
+  - `dailySalesFormData`
+  - `dailySalesEntries`
+  - `recordDailySalesEntry()`
+  - `dataVersion` (데이터 갱신 트리거)
+- AI 상태:
+  - `aiAnalysis.isLoading`
+  - `aiAnalysis.lastReport`
+  - `aiAnalysis.reportGeneratedAt`
+  - `generateAIReport()`, `clearAIReport()`
+- 표시 상태:
+  - `showGrossSales` + `toggleSalesMode()`
+  - `selectedPeriod` (`daily|weekly|monthly`)
+
+Store 워크플로우 규칙:
+1. Header Store Selector에서 전역 store 선택
+2. 선택값에 따라 대시보드 조회 API 파라미터 동기화
+3. Form 저장은 `all` 불가, 단일 지점 강제
+4. API 저장 payload는 `storeKey: st-clair|woodbridge`
 
 ---
 
 ## 6. 화면-API-DB 동기화 체크포인트
 
-- UI 표시명:
+### 6.1 UI 표시명
+
 - All Stores
 - St. Clair
 - Woodbridge
 
-- API `storeKey`:
+### 6.2 API storeKey
+
 - `all`
 - `st-clair`
 - `woodbridge`
 
-- DB `stores.key`:
+### 6.3 DB stores.key
+
 - `st-clair`
 - `woodbridge`
 
-- 저장 금지 규칙:
-- `all`은 조회/집계 전용이며 DB 저장 대상이 아니다
+### 6.4 저장 금지 규칙
 
-- 필드 정합성:
+- `all`은 집계 전용이며 `POST /api/v1/sales`에서 허용되지 않는다.
+
+### 6.5 필드 정합성
+
 - `doorDashSales` ↔ `doordash_sales`
 - `actualClosingCash` ↔ `actual_closing_cash`
+- `tips` ↔ `card_tip`
 
 ---
 
-## 7. 최종 요약
+## 7. 페이지/라우트 구성 검증
 
-본 프론트엔드 문서는 현재 구현 기준을 반영하면서도 DB/API 문서와 동일한 Store 규격을 사용하도록 정리되었다.
+현재 실제 사용자 페이지 라우트:
+- `/` -> Dashboard 단일 페이지
+
+현재 실제 API 라우트:
+- `/api/v1/stores`
+- `/api/v1/sales`
+- `/api/v1/dashboard/summary`
+- `/api/v1/dashboard/trends`
+- `/api/v1/dashboard/cash-analysis`
+- `/api/v1/holidays`
+- `/api/v1/holidays/upcoming`
+- `/api/v1/holidays/comparison`
+- `/api/v1/ai/analyze`
+
+---
+
+## 8. 최종 요약
+
+본 문서는 현재 구현 코드 기준으로 UI/상태/API 연동 정보를 재정리한 동기화 버전이다.
 
 핵심 보장 항목:
-
-- St. Clair / Woodbridge 2개 지점 기준 UX 일관성
-- All Stores 집계 흐름 유지
-- Store Selector, Dashboard, Form, AI Widget 간 동일한 store context 사용
-- API/DB와 모순 없는 `storeKey` 및 금액 필드 계약 유지
+- 단일 대시보드 페이지 구조와 실제 컴포넌트 반영
+- Zustand + Workflow Context 상태 모델 반영
+- Drawer/Form/AI 위젯 실제 동작 반영
+- API 호출 경로 및 Store/필드 계약 반영
