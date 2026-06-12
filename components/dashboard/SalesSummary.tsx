@@ -91,6 +91,35 @@ function buildSlides(entries: SaleRecord[], salesMode: SalesMode): SalesSlide[] 
   })
 }
 
+function aggregateSalesByDate(entries: SaleRecord[]): SaleRecord[] {
+  const totalsByDate = new Map<string, SaleRecord>()
+
+  for (const entry of entries) {
+    const existing = totalsByDate.get(entry.salesDate)
+    if (!existing) {
+      totalsByDate.set(entry.salesDate, { ...entry })
+      continue
+    }
+
+    totalsByDate.set(entry.salesDate, {
+      ...existing,
+      cardSales: existing.cardSales + entry.cardSales,
+      cashSales: existing.cashSales + entry.cashSales,
+      uberEatsSales: existing.uberEatsSales + entry.uberEatsSales,
+      doorDashSales: existing.doorDashSales + entry.doorDashSales,
+      cashAndCarrySales: existing.cashAndCarrySales + entry.cashAndCarrySales,
+      tips: existing.tips + entry.tips,
+      actualClosingCash: existing.actualClosingCash + entry.actualClosingCash,
+      totalSales: existing.totalSales + entry.totalSales,
+      netSales: existing.netSales + entry.netSales,
+      expectedCash: existing.expectedCash + entry.expectedCash,
+      cashDifference: existing.cashDifference + entry.cashDifference,
+    })
+  }
+
+  return Array.from(totalsByDate.values()).sort((left, right) => left.salesDate.localeCompare(right.salesDate))
+}
+
 function SalesCard({ title, value, change, icon: Icon }: SalesCardProps) {
   const isPositive = change >= 0
 
@@ -148,7 +177,7 @@ export function SalesSummary() {
           storeKey: selectedStoreId,
           startDate: startDate.toISOString().split('T')[0],
           endDate: endDate.toISOString().split('T')[0],
-          limit: 8,
+          limit: selectedStoreId === 'all' ? 16 : 8,
           sortOrder: 'asc',
         }),
         getDashboardTrends({
@@ -161,7 +190,11 @@ export function SalesSummary() {
 
       if (!isMounted) return
 
-      setSlides(buildSlides(salesResponse.items, salesMode))
+      const summarizedItems = selectedStoreId === 'all'
+        ? aggregateSalesByDate(salesResponse.items)
+        : salesResponse.items
+
+      setSlides(buildSlides(summarizedItems, salesMode))
       setTrendLabels(trendResponse.labels)
       setTrendDatasets(trendResponse.datasets)
       setChartPeriodTotal(trendResponse.periodTotal)
