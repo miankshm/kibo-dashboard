@@ -192,7 +192,10 @@ export function DailySalesForm() {
         </SheetHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-6">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="mt-4 space-y-6 px-4 pb-6 sm:px-6 sm:pb-8"
+          >
             {selectedStoreId === 'all' ? (
               <FormField
                 control={form.control}
