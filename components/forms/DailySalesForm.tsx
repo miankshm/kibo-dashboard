@@ -29,7 +29,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Separator } from '@/components/ui/separator'
 import { useWorkflow } from '@/contexts/workflow-context'
 import { cn } from '@/lib/utils'
-import { useEffect, useState } from 'react'
+import { type ClipboardEvent, type FocusEvent, type KeyboardEvent, type MouseEvent, useEffect, useState } from 'react'
 import { useStore, STORES, type StoreId, type Language } from '@/store/useStore'
 import { getTranslation } from '@/lib/i18n'
 import { getSalesList } from '@/lib/api/sales'
@@ -43,19 +43,22 @@ import {
 
 const createFormSchema = (language: Language) => {
   const text = getTranslation(language)
+  const numericFieldSchema = z
+    .union([z.number().min(0, text.dailySalesForm.nonNegativeError), z.literal('')])
+    .optional()
 
   return z.object({
     storeId: z.enum(['st-clair', 'woodbridge']).optional(),
     date: z.date({
       required_error: text.dailySalesForm.selectDateError,
     }),
-    cardSales: z.number().min(0, text.dailySalesForm.nonNegativeError),
-    cashSales: z.number().min(0, text.dailySalesForm.nonNegativeError),
-    uberEatsSales: z.number().min(0, text.dailySalesForm.nonNegativeError),
-    doorDashSales: z.number().min(0, text.dailySalesForm.nonNegativeError),
-    cashAndCarrySales: z.number().min(0, text.dailySalesForm.nonNegativeError),
-    tips: z.number().min(0, text.dailySalesForm.nonNegativeError),
-    actualClosingCash: z.number().min(0, text.dailySalesForm.nonNegativeError),
+    cardSales: numericFieldSchema,
+    cashSales: numericFieldSchema,
+    uberEatsSales: numericFieldSchema,
+    doorDashSales: numericFieldSchema,
+    cashAndCarrySales: numericFieldSchema,
+    tips: numericFieldSchema,
+    actualClosingCash: numericFieldSchema,
   })
 }
 
@@ -85,6 +88,53 @@ export function DailySalesForm() {
     resolver: zodResolver(formSchema),
     defaultValues: getDefaultFormValues(),
   })
+
+  const handleNumericInputFocus = (event: FocusEvent<HTMLInputElement>) => {
+    if (event.currentTarget.value === '0') {
+      event.currentTarget.select()
+    }
+  }
+
+  const handleNumericInputClick = (event: MouseEvent<HTMLInputElement>) => {
+    if (event.currentTarget.value === '0') {
+      event.currentTarget.select()
+    }
+  }
+
+  const handleNumericInputChange = (
+    rawValue: string,
+    onChange: (nextValue: number | '' | undefined) => void
+  ) => {
+    if (rawValue === '') {
+      onChange('')
+      return
+    }
+
+    const parsedValue = Number(rawValue)
+    if (Number.isNaN(parsedValue)) {
+      onChange('')
+      return
+    }
+
+    onChange(parsedValue)
+  }
+
+  const handleNumericInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (['e', 'E', '+', '-'].includes(event.key)) {
+      event.preventDefault()
+    }
+  }
+
+  const handleNumericInputPaste = (event: ClipboardEvent<HTMLInputElement>) => {
+    const pastedText = event.clipboardData.getData('text')
+    if (!/^\d*\.?\d*$/.test(pastedText)) {
+      event.preventDefault()
+    }
+  }
+
+  const numericInputClassName =
+    '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+
   const watchedDate = form.watch('date')
   const watchedStoreId = form.watch('storeId')
   const resolvedStoreIdForLookup: StoreId | undefined =
@@ -161,10 +211,21 @@ export function DailySalesForm() {
       return
     }
 
+    const normalizedData = {
+      ...data,
+      cardSales: typeof data.cardSales === 'number' ? data.cardSales : 0,
+      cashSales: typeof data.cashSales === 'number' ? data.cashSales : 0,
+      uberEatsSales: typeof data.uberEatsSales === 'number' ? data.uberEatsSales : 0,
+      doorDashSales: typeof data.doorDashSales === 'number' ? data.doorDashSales : 0,
+      cashAndCarrySales: typeof data.cashAndCarrySales === 'number' ? data.cashAndCarrySales : 0,
+      tips: typeof data.tips === 'number' ? data.tips : 0,
+      actualClosingCash: typeof data.actualClosingCash === 'number' ? data.actualClosingCash : 0,
+    }
+
     setIsSubmitting(true)
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1500))
-    await recordDailySalesEntry({ ...data, storeId: resolvedStoreId })
+    await recordDailySalesEntry({ ...normalizedData, storeId: resolvedStoreId })
     setIsSubmitting(false)
     resetDailySalesFormData()
     closeDrawer('dailySalesForm')
@@ -289,9 +350,18 @@ export function DailySalesForm() {
                     <FormControl>
                       <Input
                         type="number"
+                        className={numericInputClassName}
                         placeholder="0"
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
                         {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        value={field.value ?? ''}
+                        onFocus={handleNumericInputFocus}
+                        onClick={handleNumericInputClick}
+                        onKeyDown={handleNumericInputKeyDown}
+                        onPaste={handleNumericInputPaste}
+                        onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -308,9 +378,18 @@ export function DailySalesForm() {
                     <FormControl>
                       <Input
                         type="number"
+                        className={numericInputClassName}
                         placeholder="0"
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
                         {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        value={field.value ?? ''}
+                        onFocus={handleNumericInputFocus}
+                        onClick={handleNumericInputClick}
+                        onKeyDown={handleNumericInputKeyDown}
+                        onPaste={handleNumericInputPaste}
+                        onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -334,9 +413,18 @@ export function DailySalesForm() {
                     <FormControl>
                       <Input
                         type="number"
+                        className={numericInputClassName}
                         placeholder="0"
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
                         {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        value={field.value ?? ''}
+                        onFocus={handleNumericInputFocus}
+                        onClick={handleNumericInputClick}
+                        onKeyDown={handleNumericInputKeyDown}
+                        onPaste={handleNumericInputPaste}
+                        onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -353,9 +441,18 @@ export function DailySalesForm() {
                     <FormControl>
                       <Input
                         type="number"
+                        className={numericInputClassName}
                         placeholder="0"
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
                         {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        value={field.value ?? ''}
+                        onFocus={handleNumericInputFocus}
+                        onClick={handleNumericInputClick}
+                        onKeyDown={handleNumericInputKeyDown}
+                        onPaste={handleNumericInputPaste}
+                        onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -372,9 +469,18 @@ export function DailySalesForm() {
                     <FormControl>
                       <Input
                         type="number"
+                        className={numericInputClassName}
                         placeholder="0"
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
                         {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        value={field.value ?? ''}
+                        onFocus={handleNumericInputFocus}
+                        onClick={handleNumericInputClick}
+                        onKeyDown={handleNumericInputKeyDown}
+                        onPaste={handleNumericInputPaste}
+                        onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -398,9 +504,18 @@ export function DailySalesForm() {
                     <FormControl>
                       <Input
                         type="number"
+                        className={numericInputClassName}
                         placeholder="0"
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
                         {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        value={field.value ?? ''}
+                        onFocus={handleNumericInputFocus}
+                        onClick={handleNumericInputClick}
+                        onKeyDown={handleNumericInputKeyDown}
+                        onPaste={handleNumericInputPaste}
+                        onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -417,9 +532,18 @@ export function DailySalesForm() {
                     <FormControl>
                       <Input
                         type="number"
+                        className={numericInputClassName}
                         placeholder="0"
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
                         {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        value={field.value ?? ''}
+                        onFocus={handleNumericInputFocus}
+                        onClick={handleNumericInputClick}
+                        onKeyDown={handleNumericInputKeyDown}
+                        onPaste={handleNumericInputPaste}
+                        onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
                       />
                     </FormControl>
                     <FormDescription>{text.dailySalesForm.actualCashDescription}</FormDescription>
