@@ -29,7 +29,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Separator } from '@/components/ui/separator'
 import { useWorkflow } from '@/contexts/workflow-context'
 import { cn } from '@/lib/utils'
-import { type ClipboardEvent, type FocusEvent, type KeyboardEvent, type MouseEvent, useEffect, useState } from 'react'
+import { type ClipboardEvent, type FocusEvent, type KeyboardEvent, type MouseEvent, type WheelEvent, useEffect, useState } from 'react'
 import { useStore, STORES, type StoreId, type Language } from '@/store/useStore'
 import { getTranslation } from '@/lib/i18n'
 import { getSalesList } from '@/lib/api/sales'
@@ -131,6 +131,10 @@ export function DailySalesForm() {
     if (!/^\d*\.?\d*$/.test(pastedText)) {
       event.preventDefault()
     }
+  }
+
+  const handleNumericInputWheel = (event: WheelEvent<HTMLInputElement>) => {
+    event.currentTarget.blur()
   }
 
   const numericInputClassName =
@@ -366,6 +370,7 @@ export function DailySalesForm() {
                         value={field.value ?? ''}
                         onFocus={handleNumericInputFocus}
                         onClick={handleNumericInputClick}
+                        onWheel={handleNumericInputWheel}
                         onKeyDown={handleNumericInputKeyDown}
                         onPaste={handleNumericInputPaste}
                         onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
@@ -394,6 +399,7 @@ export function DailySalesForm() {
                         value={field.value ?? ''}
                         onFocus={handleNumericInputFocus}
                         onClick={handleNumericInputClick}
+                        onWheel={handleNumericInputWheel}
                         onKeyDown={handleNumericInputKeyDown}
                         onPaste={handleNumericInputPaste}
                         onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
@@ -429,6 +435,7 @@ export function DailySalesForm() {
                         value={field.value ?? ''}
                         onFocus={handleNumericInputFocus}
                         onClick={handleNumericInputClick}
+                        onWheel={handleNumericInputWheel}
                         onKeyDown={handleNumericInputKeyDown}
                         onPaste={handleNumericInputPaste}
                         onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
@@ -457,6 +464,7 @@ export function DailySalesForm() {
                         value={field.value ?? ''}
                         onFocus={handleNumericInputFocus}
                         onClick={handleNumericInputClick}
+                        onWheel={handleNumericInputWheel}
                         onKeyDown={handleNumericInputKeyDown}
                         onPaste={handleNumericInputPaste}
                         onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
@@ -485,6 +493,7 @@ export function DailySalesForm() {
                         value={field.value ?? ''}
                         onFocus={handleNumericInputFocus}
                         onClick={handleNumericInputClick}
+                        onWheel={handleNumericInputWheel}
                         onKeyDown={handleNumericInputKeyDown}
                         onPaste={handleNumericInputPaste}
                         onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
@@ -520,6 +529,7 @@ export function DailySalesForm() {
                         value={field.value ?? ''}
                         onFocus={handleNumericInputFocus}
                         onClick={handleNumericInputClick}
+                        onWheel={handleNumericInputWheel}
                         onKeyDown={handleNumericInputKeyDown}
                         onPaste={handleNumericInputPaste}
                         onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
@@ -548,6 +558,7 @@ export function DailySalesForm() {
                         value={field.value ?? ''}
                         onFocus={handleNumericInputFocus}
                         onClick={handleNumericInputClick}
+                        onWheel={handleNumericInputWheel}
                         onKeyDown={handleNumericInputKeyDown}
                         onPaste={handleNumericInputPaste}
                         onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
