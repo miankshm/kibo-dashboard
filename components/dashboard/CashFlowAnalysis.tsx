@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import type { UseEmblaCarouselType } from 'embla-carousel-react'
-import { AlertTriangle, ArrowUpDown, DollarSign, TrendingDown, TrendingUp } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, ArrowUpDown, DollarSign, TrendingDown, TrendingUp } from 'lucide-react'
 import { getCashAnalysis } from '@/lib/api/dashboard'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel'
+import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel'
 import { useWorkflow } from '@/contexts/workflow-context'
 import { getTranslation } from '@/lib/i18n'
 import type { CashAnalysisWindow } from '@/lib/types'
@@ -87,6 +88,8 @@ export function CashFlowAnalysis() {
   }, [carouselApi])
 
   const currentPeriod = windows[currentIndex] ?? windows[0]
+  const canMoveToPreviousPeriod = carouselApi?.canScrollNext() ?? false
+  const canMoveToNextPeriod = carouselApi?.canScrollPrev() ?? false
 
   return (
     <section id="cashflow" className="space-y-6">
@@ -160,8 +163,28 @@ export function CashFlowAnalysis() {
               </CarouselItem>
             ))}
           </CarouselContent>
-          <CarouselPrevious className="-left-8 h-8 w-8" />
-          <CarouselNext className="-right-8 h-8 w-8" />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="absolute top-1/2 -left-8 h-8 w-8 -translate-y-1/2 rounded-full"
+            onClick={() => carouselApi?.scrollNext()}
+            disabled={!canMoveToPreviousPeriod}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="sr-only">Previous period</span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="absolute top-1/2 -right-8 h-8 w-8 -translate-y-1/2 rounded-full"
+            onClick={() => carouselApi?.scrollPrev()}
+            disabled={!canMoveToNextPeriod}
+          >
+            <ArrowRight className="h-4 w-4" />
+            <span className="sr-only">Next period</span>
+          </Button>
         </Carousel>
       </div>
 
