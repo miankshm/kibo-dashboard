@@ -79,6 +79,7 @@ export function DailySalesForm() {
   const { drawerState, closeDrawer, resetDailySalesFormData, recordDailySalesEntry } = useWorkflow()
   const { selectedStoreId, language } = useStore()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
   const text = getTranslation(language)
   const dateLocale = language === 'ko' ? ko : enUS
   const selectedStore = STORES.find((store) => store.id === selectedStoreId)
@@ -148,6 +149,7 @@ export function DailySalesForm() {
       ...getDefaultFormValues(),
       storeId: selectedStoreId === 'all' ? lastSelectedStore : undefined,
     })
+    setIsDatePickerOpen(false)
   }, [drawerState.dailySalesForm, selectedStoreId, form])
 
   useEffect(() => {
@@ -299,7 +301,7 @@ export function DailySalesForm() {
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>{text.dailySalesForm.dateLabel}</FormLabel>
-                  <Popover>
+                  <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
@@ -322,7 +324,12 @@ export function DailySalesForm() {
                       <Calendar
                         mode="single"
                         selected={field.value}
-                        onSelect={field.onChange}
+                        onSelect={(selectedDate) => {
+                          field.onChange(selectedDate)
+                          if (selectedDate) {
+                            setIsDatePickerOpen(false)
+                          }
+                        }}
                         disabled={(date) =>
                           date > new Date() || date < new Date('2020-01-01')
                         }
