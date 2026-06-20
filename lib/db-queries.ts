@@ -376,9 +376,21 @@ export async function getDashboardTrendsFromDb(params: {
   let points: number[] = []
 
   if (params.period === 'daily') {
-    const rows = await getDailyAggregates(params.storeKey, toDateKey(addDays(now, -6)), toDateKey(now))
-    labels = rows.map((row) => toDisplayLabel(row.salesDate, language))
-    points = rows.map((row) => (params.salesMode === 'gross' ? row.totalSales : row.netSales))
+    const daysFromMonday = (now.getDay() + 6) % 7
+    const weekStart = addDays(now, -daysFromMonday)
+    const rows = await getDailyAggregates(params.storeKey, toDateKey(weekStart), toDateKey(now))
+    const valueByDate = new Map(
+      rows.map((row) => [
+        row.salesDate,
+        params.salesMode === 'gross' ? row.totalSales : row.netSales,
+      ])
+    )
+
+    const dailyDates = Array.from({ length: daysFromMonday + 1 }, (_, index) =>
+      addDays(weekStart, index)
+    )
+    labels = dailyDates.map((date) => toDisplayLabel(toDateKey(date), language))
+    points = dailyDates.map((date) => valueByDate.get(toDateKey(date)) ?? 0)
   } else if (params.period === 'weekly') {
     labels = language === 'ko' ? ['1주차', '2주차', '3주차', '4주차'] : ['W1', 'W2', 'W3', 'W4']
     points = await Promise.all(
