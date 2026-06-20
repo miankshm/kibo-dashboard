@@ -29,9 +29,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Separator } from '@/components/ui/separator'
 import { useWorkflow } from '@/contexts/workflow-context'
 import { cn } from '@/lib/utils'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore, STORES, type StoreId, type Language } from '@/store/useStore'
 import { getTranslation } from '@/lib/i18n'
+import { getSalesList } from '@/lib/api/sales'
 import {
   Select,
   SelectContent,
@@ -60,6 +61,17 @@ const createFormSchema = (language: Language) => {
 
 type FormValues = z.infer<ReturnType<typeof createFormSchema>>
 
+const getDefaultFormValues = (): FormValues => ({
+  date: new Date(),
+  cardSales: 0,
+  cashSales: 0,
+  uberEatsSales: 0,
+  doorDashSales: 0,
+  cashAndCarrySales: 0,
+  tips: 0,
+  actualClosingCash: 0,
+})
+
 export function DailySalesForm() {
   const { drawerState, closeDrawer, resetDailySalesFormData, recordDailySalesEntry } = useWorkflow()
   const { selectedStoreId, language } = useStore()
@@ -71,16 +83,74 @@ export function DailySalesForm() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      cardSales: 0,
-      cashSales: 0,
-      uberEatsSales: 0,
-      doorDashSales: 0,
-      cashAndCarrySales: 0,
-      tips: 0,
-      actualClosingCash: 0,
-    },
+    defaultValues: getDefaultFormValues(),
   })
+  const watchedDate = form.watch('date')
+  const watchedStoreId = form.watch('storeId')
+  const resolvedStoreIdForLookup: StoreId | undefined =
+    selectedStoreId === 'all' ? watchedStoreId : selectedStoreId
+
+  useEffect(() => {
+    if (!drawerState.dailySalesForm) return
+
+    const lastSelectedStore = form.getValues('storeId')
+    form.reset({
+      ...getDefaultFormValues(),
+      storeId: selectedStoreId === 'all' ? lastSelectedStore : undefined,
+    })
+  }, [drawerState.dailySalesForm, selectedStoreId, form])
+
+  useEffect(() => {
+    if (!drawerState.dailySalesForm) return
+    if (!watchedDate) return
+    if (!resolvedStoreIdForLookup) return
+
+    let cancelled = false
+
+    const loadExistingEntry = async () => {
+      const salesDate = format(watchedDate, 'yyyy-MM-dd')
+
+      try {
+        const response = await getSalesList({
+          storeKey: resolvedStoreIdForLookup,
+          startDate: salesDate,
+          endDate: salesDate,
+          limit: 1,
+          sortOrder: 'desc',
+        })
+
+        if (cancelled) return
+
+        const existingEntry = response.items[0]
+        if (!existingEntry) {
+          form.setValue('cardSales', 0)
+          form.setValue('cashSales', 0)
+          form.setValue('uberEatsSales', 0)
+          form.setValue('doorDashSales', 0)
+          form.setValue('cashAndCarrySales', 0)
+          form.setValue('tips', 0)
+          form.setValue('actualClosingCash', 0)
+          return
+        }
+
+        form.setValue('cardSales', existingEntry.cardSales)
+        form.setValue('cashSales', existingEntry.cashSales)
+        form.setValue('uberEatsSales', existingEntry.uberEatsSales)
+        form.setValue('doorDashSales', existingEntry.doorDashSales)
+        form.setValue('cashAndCarrySales', existingEntry.cashAndCarrySales)
+        form.setValue('tips', existingEntry.tips)
+        form.setValue('actualClosingCash', existingEntry.actualClosingCash)
+      } catch {
+        if (cancelled) return
+      }
+    }
+
+    void loadExistingEntry()
+
+    return () => {
+      cancelled = true
+    }
+  }, [drawerState.dailySalesForm, watchedDate, resolvedStoreIdForLookup, form])
 
   const onSubmit = async (data: FormValues) => {
     const resolvedStoreId: StoreId | null =
@@ -96,13 +166,11 @@ export function DailySalesForm() {
     await new Promise((resolve) => setTimeout(resolve, 1500))
     await recordDailySalesEntry({ ...data, storeId: resolvedStoreId })
     setIsSubmitting(false)
-    form.reset()
     resetDailySalesFormData()
     closeDrawer('dailySalesForm')
   }
 
   const handleClose = () => {
-    form.reset()
     closeDrawer('dailySalesForm')
   }
 
