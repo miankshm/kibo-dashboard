@@ -226,12 +226,12 @@ export function SalesSummary() {
 
   const currentSlide = slides[currentIndex] ?? slides[slides.length - 1]
   const displayTotal = currentSlide?.total ?? 0
-  const selectedPeriodLabel =
+  const cumulativeSalesLabel =
     selectedPeriod === 'daily'
-      ? text.salesSummary.daily
+      ? text.salesSummary.cumulativeThisWeek
       : selectedPeriod === 'weekly'
-        ? text.salesSummary.weekly
-        : text.salesSummary.monthly
+        ? text.salesSummary.cumulativeThisMonth
+        : text.salesSummary.cumulativeThisYear
 
   const trendValues = trendDatasets[0]?.data ?? []
   const chartData = useMemo(() => ({
@@ -378,7 +378,7 @@ export function SalesSummary() {
               <CardTitle>{text.salesSummary.trendTitle}</CardTitle>
               <CardDescription>
                 <span className="font-medium text-foreground">
-                  {selectedPeriodLabel} {text.salesSummary.periodTotal} ${Math.round(chartPeriodTotal).toLocaleString()}
+                  {cumulativeSalesLabel} ${Math.round(chartPeriodTotal).toLocaleString()}
                 </span>
               </CardDescription>
             </div>
