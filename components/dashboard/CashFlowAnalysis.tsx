@@ -38,6 +38,15 @@ function formatRange(startDate: string, endDate: string, language: 'ko' | 'en') 
   return `${startLabel} - ${endLabel}`
 }
 
+function formatDetailDate(dateValue: string, language: 'ko' | 'en') {
+  const date = new Date(`${dateValue}T00:00:00`)
+  const weekday = new Intl.DateTimeFormat(language === 'ko' ? 'ko-KR' : 'en-US', {
+    weekday: 'short',
+  }).format(date)
+
+  return `${date.getMonth() + 1}/${date.getDate()}(${weekday})`
+}
+
 export function CashFlowAnalysis() {
   const { selectedStoreId, language } = useStore()
   const { dataVersion } = useWorkflow()
@@ -220,10 +229,7 @@ export function CashFlowAnalysis() {
                 >
                   <div className="flex items-center gap-4">
                     <div className="text-sm font-medium">
-                      {new Date(`${item.date}T00:00:00`).toLocaleDateString(language === 'ko' ? 'ko-KR' : 'en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
+                      {formatDetailDate(item.date, language)}
                     </div>
                     <div className="hidden gap-4 text-sm text-muted-foreground sm:flex">
                       <span>{text.cashFlow.expected}: {formatCurrency(item.expected)}</span>

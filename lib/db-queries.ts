@@ -54,10 +54,12 @@ function toDateKey(value: Date | string) {
 }
 
 function toDisplayLabel(dateValue: string, language: 'ko' | 'en') {
-  return new Date(`${dateValue}T00:00:00`).toLocaleDateString(language === 'ko' ? 'ko-KR' : 'en-US', {
-    month: 'short',
-    day: 'numeric',
-  })
+  const date = new Date(`${dateValue}T00:00:00`)
+  const weekday = new Intl.DateTimeFormat(language === 'ko' ? 'ko-KR' : 'en-US', {
+    weekday: 'short',
+  }).format(date)
+
+  return `${weekday}(${date.getMonth() + 1}/${date.getDate()})`
 }
 
 function isPersistedStoreKey(value: string): value is NonAggregateStoreKey {
