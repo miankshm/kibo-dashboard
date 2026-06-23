@@ -131,7 +131,15 @@ API 호출:
 - 날짜 필수, 금액 음수 불가
 - `selectedStoreId === all`일 때만 store 선택 필드 노출
 - 저장 전 최종 store는 반드시 `st-clair|woodbridge`
-- 총합(`Total Sales`) 실시간 계산 표시
+- 상단 라벨 변경: `날짜`, `매장 방문 결제`, `마감 현금`
+- 매장 방문 결제 입력 순서: `Card -> Paid Out(Card Tip) -> Cash`
+- 매장 방문 결제 섹션 우측에 `(Card + Cash)` 금액 실시간 표시 (`Paid Out` 제외)
+- 배달앱 매출은 `Uber Eats`, `DoorDash`만 포함하고 DoorDash 하단 구분선 표시
+- `Cash & Carry`는 배달앱 섹션과 분리된 단독 입력 영역으로 표시
+- 마감 현금 섹션 우측에 `(Cash - Paid Out)` 금액 실시간 표시
+- 총합(`Total Sales`) 실시간 계산 표시 (`Card + Cash + UberEats + DoorDash + Cash&Carry`)
+- 예상 마감 현금(`Cash Sales - Paid Out(Card Tip)`) 실시간 계산 표시
+- 순매출(`Card + Cash + Cash & Carry + UberEats*0.77 + DoorDash*0.85`) 저장
 
 제출 플로우:
 1. 1.5초 로딩 시뮬레이션

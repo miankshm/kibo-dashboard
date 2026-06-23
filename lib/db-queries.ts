@@ -22,7 +22,8 @@ import type {
   UpcomingHoliday,
 } from '@/lib/types'
 
-const NET_RATIO = 0.85
+const UBER_NET_RATIO = 0.77
+const DOORDASH_NET_RATIO = 0.85
 
 function asNumber(value: unknown) {
   if (typeof value === 'number') {
@@ -275,9 +276,15 @@ export async function upsertSaleInDb(input: DailySalesInput) {
   }
 
   const totalSales = input.cardSales + input.cashSales + input.uberEatsSales + input.doorDashSales + input.cashAndCarrySales
-  const expectedCashAmount = input.cashSales
+  const expectedCashAmount = input.cashSales - input.tips
   const cashDifference = input.actualClosingCash - expectedCashAmount
-  const netSales = Number((totalSales * NET_RATIO).toFixed(2))
+  const netSales = Number((
+    input.cardSales +
+    input.cashSales +
+    input.cashAndCarrySales +
+    (input.uberEatsSales * UBER_NET_RATIO) +
+    (input.doorDashSales * DOORDASH_NET_RATIO)
+  ).toFixed(2))
 
   const [row] = await db
     .insert(sales)

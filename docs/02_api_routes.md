@@ -77,7 +77,7 @@ Drizzle ORM + PostgreSQL
 | GET | `/api/v1/holidays/comparison` | Holiday 연도 비교 |
 | POST | `/api/v1/ai/analyze` | AI 분석 리포트 생성 |
 
-현재 코드에 없는 엔드포인트(auth/admin/audit/bulk-upload/weather 등)는 본 문서에서 제거했다.
+현재 코드에 없는 엔드포인트(auth/admin/audit/bulk-upload 등)는 본 문서에서 제거했다.
 
 ---
 
@@ -219,9 +219,9 @@ Success `200`:
     "tips": 500,
     "actualClosingCash": 1800,
     "totalSales": 7500,
-    "netSales": 6375,
-    "expectedCash": 1200,
-    "cashDifference": 600,
+    "netSales": 7226,
+    "expectedCash": 700,
+    "cashDifference": 1100,
     "isUpsert": true
   }
 }
@@ -463,7 +463,8 @@ Error:
 ## 6. Business Logic Notes (Implemented)
 
 - Sales upsert는 (`store_id`, `sales_date`) 충돌 업데이트 방식.
-- Net Sales 계산 비율은 고정 `0.85`.
+- `expectedCashAmount = cashSales - tips`.
+- `netSales = cardSales + cashSales + cashAndCarrySales + (uberEatsSales * 0.77) + (doorDashSales * 0.85)`.
 - Dashboard Summary의 `growthRate`는 이전 동일 길이 기간 대비 증감률.
 - Trends:
   - `daily`: 최근 7일

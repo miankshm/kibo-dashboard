@@ -243,9 +243,9 @@ Indexes:
 ### 6.1 Sales 계산 로직
 
 - `totalSales = cardSales + cashSales + uberEatsSales + doorDashSales + cashAndCarrySales`
-- `expectedCashAmount = cashSales`
+- `expectedCashAmount = cashSales - tips`
 - `cashDifference = actualClosingCash - expectedCashAmount`
-- `netSales = totalSales * 0.85` (`NET_RATIO = 0.85`)
+- `netSales = cardSales + cashSales + cashAndCarrySales + (uberEatsSales * 0.77) + (doorDashSales * 0.85)`
 
 ### 6.2 Sales 저장 로직
 
