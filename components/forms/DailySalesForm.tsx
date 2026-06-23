@@ -243,6 +243,12 @@ export function DailySalesForm() {
 
   // 총 매출 계산
   const watchedValues = form.watch()
+  const inStorePaymentTotal =
+    (watchedValues.cardSales || 0) +
+    (watchedValues.cashSales || 0)
+  const closingCash =
+    (watchedValues.cashSales || 0) -
+    (watchedValues.tips || 0)
   const totalSales =
     (watchedValues.cardSales || 0) +
     (watchedValues.cashSales || 0) +
@@ -298,7 +304,7 @@ export function DailySalesForm() {
               </FormItem>
             )}
 
-            {/* 기준일 */}
+            {/* 날짜 */}
             <FormField
               control={form.control}
               name="date"
@@ -348,9 +354,14 @@ export function DailySalesForm() {
 
             <Separator />
 
-            {/* 결제 수단별 매출 */}
+            {/* 매장 방문 결제 */}
             <div className="space-y-4">
-              <h4 className="text-sm font-medium">{text.dailySalesForm.paymentTitle}</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium">{text.dailySalesForm.paymentTitle}</h4>
+                <span className="text-sm font-medium">
+                  ${inStorePaymentTotal.toLocaleString()}
+                </span>
+              </div>
 
               <FormField
                 control={form.control}
@@ -358,6 +369,35 @@ export function DailySalesForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Card</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        className={numericInputClassName}
+                        placeholder="0"
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
+                        {...field}
+                        value={field.value ?? ''}
+                        onFocus={handleNumericInputFocus}
+                        onClick={handleNumericInputClick}
+                        onWheel={handleNumericInputWheel}
+                        onKeyDown={handleNumericInputKeyDown}
+                        onPaste={handleNumericInputPaste}
+                        onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="tips"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{text.dailySalesForm.tips}</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -475,6 +515,11 @@ export function DailySalesForm() {
                 )}
               />
 
+              <Separator />
+            </div>
+
+            {/* Cash & Carry */}
+            <div className="space-y-4">
               <FormField
                 control={form.control}
                 name="cashAndCarrySales"
@@ -507,38 +552,14 @@ export function DailySalesForm() {
 
             <Separator />
 
-            {/* 기타 */}
+            {/* 마감 현금 */}
             <div className="space-y-4">
-              <h4 className="text-sm font-medium">{text.dailySalesForm.otherTitle}</h4>
-
-              <FormField
-                control={form.control}
-                name="tips"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{text.dailySalesForm.tips}</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        className={numericInputClassName}
-                        placeholder="0"
-                        inputMode="decimal"
-                        min={0}
-                        step="any"
-                        {...field}
-                        value={field.value ?? ''}
-                        onFocus={handleNumericInputFocus}
-                        onClick={handleNumericInputClick}
-                        onWheel={handleNumericInputWheel}
-                        onKeyDown={handleNumericInputKeyDown}
-                        onPaste={handleNumericInputPaste}
-                        onChange={(e) => handleNumericInputChange(e.target.value, field.onChange)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium">{text.dailySalesForm.closingCashTitle}</h4>
+                <span className="text-sm font-medium">
+                  ${closingCash.toLocaleString()}
+                </span>
+              </div>
 
               <FormField
                 control={form.control}
