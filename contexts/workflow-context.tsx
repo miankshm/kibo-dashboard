@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import type { StoreId } from '@/store/useStore'
+import type { AIReport } from '@/lib/types'
 import { useStore } from '@/store/useStore'
 import { analyzeAIReport } from '@/lib/api/ai'
 import { getSalesList, upsertDailySales } from '@/lib/api/sales'
@@ -28,6 +29,7 @@ export interface DailySalesEntry extends DailySalesFormData {
 export interface AIAnalysisState {
   isLoading: boolean
   lastReport: string | null
+  lastReportInsights: AIReport['insights'] | null
   reportGeneratedAt: Date | null
 }
 
@@ -92,6 +94,7 @@ const initialDailySalesFormData: DailySalesFormData = {
 const initialAIAnalysis: AIAnalysisState = {
   isLoading: false,
   lastReport: null,
+  lastReportInsights: null,
   reportGeneratedAt: null,
 }
 
@@ -195,6 +198,7 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
       setAIAnalysis({
         isLoading: false,
         lastReport: report.summary,
+        lastReportInsights: report.insights ?? null,
         reportGeneratedAt: new Date(report.generatedAt),
       })
     } catch {
@@ -204,6 +208,7 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
           language === 'ko'
             ? 'AI 리포트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
             : 'Unable to load the AI report. Please try again shortly.',
+        lastReportInsights: null,
         reportGeneratedAt: new Date(),
       })
     }

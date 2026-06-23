@@ -685,6 +685,27 @@ export async function createAiReportInDb(params: {
 
   const totalSalesGrowthRate = percentChange(totals.totalSales, previousTotals.totalSales)
   const netSalesGrowthRate = percentChange(totals.netSales, previousTotals.netSales)
+  const insights = {
+    totalSales: totals.totalSales,
+    netSales: totals.netSales,
+    actualCash: totals.actualCash,
+    expectedCash: totals.expectedCash,
+    totalSalesGrowthRate,
+    netSalesGrowthRate,
+    topWeekday,
+    lowWeekday,
+    weekdayDistribution: weekdayStats,
+    delivery: {
+      uberEatsSales,
+      doorDashSales,
+      deliveryTotalSales,
+      uberShare,
+      doorDashShare,
+      deliveryShare,
+      platformFeeImpact,
+      deliveryNetAfterFee,
+    },
+  }
   const label = params.storeKey === 'all' ? '전체 지점' : params.storeKey === 'st-clair' ? 'St. Clair 지점' : 'Woodbridge 지점'
   const summary = `${label} 기준 ${params.analysisType} 분석 리포트입니다.\n\n[매출 요약]\n• 기간: ${params.startDate} ~ ${params.endDate}\n• 총매출: ${Math.round(totals.totalSales).toLocaleString()}\n• 순매출: ${Math.round(totals.netSales).toLocaleString()}\n• 전주 대비 총매출 증감률: ${formatPercent(totalSalesGrowthRate)}\n• 전주 대비 순매출 증감률: ${formatPercent(netSalesGrowthRate)}\n\n[요일 분석]\n• 최고 매출 요일: ${topWeekday ? `${topWeekday.weekday} (${Math.round(topWeekday.amount).toLocaleString()}, ${topWeekday.ratio}%)` : '데이터 없음'}\n• 최저 매출 요일: ${lowWeekday ? `${lowWeekday.weekday} (${Math.round(lowWeekday.amount).toLocaleString()}, ${lowWeekday.ratio}%)` : '데이터 없음'}\n• 요일별 매출 비중: ${weekdayStats.length > 0 ? weekdayStats.map((item) => `${item.weekday} ${item.ratio}%`).join(', ') : '데이터 없음'}\n\n[배달앱 분석]\n• Uber Eats 매출 비중: ${uberShare}%\n• DoorDash 매출 비중: ${doorDashShare}%\n• 배달앱 전체 매출 비중: ${deliveryShare}%\n• 플랫폼 수수료 영향(총): ${Math.round(platformFeeImpact).toLocaleString()}\n• 수수료 반영 후 배달앱 순매출: ${Math.round(deliveryNetAfterFee).toLocaleString()} (Uber 23%, DoorDash 15%)\n\n• 예상 현금 대비 실제 현금 차액: ${Math.round(totals.actualCash - totals.expectedCash).toLocaleString()}`
   const store = params.storeKey === 'all' ? null : await getStoreByKey(params.storeKey)
@@ -697,27 +718,7 @@ export async function createAiReportInDb(params: {
       periodEnd: params.endDate,
       reportType: params.analysisType.toUpperCase(),
       summary,
-      insights: {
-        totalSales: totals.totalSales,
-        netSales: totals.netSales,
-        actualCash: totals.actualCash,
-        expectedCash: totals.expectedCash,
-        totalSalesGrowthRate,
-        netSalesGrowthRate,
-        topWeekday,
-        lowWeekday,
-        weekdayDistribution: weekdayStats,
-        delivery: {
-          uberEatsSales,
-          doorDashSales,
-          deliveryTotalSales,
-          uberShare,
-          doorDashShare,
-          deliveryShare,
-          platformFeeImpact,
-          deliveryNetAfterFee,
-        },
-      },
+      insights,
       generatedByModel: 'GPT-5.4',
     })
     .returning({ reportId: aiAnalysisReports.id, createdAt: aiAnalysisReports.createdAt })
@@ -726,5 +727,6 @@ export async function createAiReportInDb(params: {
     reportId: report.reportId,
     summary,
     generatedAt: report.createdAt?.toISOString() ?? new Date().toISOString(),
+    insights,
   }
 }

@@ -119,4 +119,35 @@ export interface AIReport {
   reportId: string
   summary: string
   generatedAt: string
+  insights?: AIReportInsights
+}
+
+export interface AIWeekdayStat {
+  weekday: string
+  amount: number
+  ratio: number
+}
+
+export interface AIDeliveryInsights {
+  uberEatsSales: number
+  doorDashSales: number
+  deliveryTotalSales: number
+  uberShare: number
+  doorDashShare: number
+  deliveryShare: number
+  platformFeeImpact: number
+  deliveryNetAfterFee: number
+}
+
+export interface AIReportInsights {
+  totalSales: number
+  netSales: number
+  actualCash: number
+  expectedCash: number
+  totalSalesGrowthRate: number | null
+  netSalesGrowthRate: number | null
+  topWeekday: AIWeekdayStat | null
+  lowWeekday: AIWeekdayStat | null
+  weekdayDistribution: AIWeekdayStat[]
+  delivery: AIDeliveryInsights
 }
