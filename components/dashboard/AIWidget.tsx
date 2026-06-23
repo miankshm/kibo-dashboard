@@ -102,6 +102,26 @@ export function AIWidget() {
       ]
     : [labels.fallbackInsight]
 
+  const personaGreeting = language === 'ko'
+    ? '안녕하세요. 이번 주 매출을 분석했습니다.'
+    : 'Hello. I analyzed this week\'s sales report.'
+
+  const personaTopPoint = insights?.topWeekday
+    ? (language === 'ko'
+      ? `가장 주목할 점은 ${insights.topWeekday.weekday} 매출 집중도입니다.`
+      : `A key highlight is the sales concentration on ${insights.topWeekday.weekday}.`)
+    : (language === 'ko'
+      ? '가장 주목할 점은 요일별 매출 분포 변화입니다.'
+      : 'A key highlight is the shift in weekday sales distribution.')
+
+  const personaDeliveryPoint = typeof insights?.delivery?.deliveryShare === 'number'
+    ? (language === 'ko'
+      ? `배달앱 매출 비중은 ${insights.delivery.deliveryShare.toFixed(1)}%입니다.`
+      : `Delivery channels account for ${insights.delivery.deliveryShare.toFixed(1)}% of total sales.`)
+    : (language === 'ko'
+      ? '배달앱 비중 데이터는 다음 리포트에서 더 정확히 안내드리겠습니다.'
+      : 'Delivery-share details will be refined in the next report.')
+
   const handleClose = () => {
     closeDrawer('aiWidget')
   }
@@ -158,6 +178,15 @@ export function AIWidget() {
               </div>
             ) : aiAnalysis.lastReport ? (
               <div className="space-y-5 pb-6">
+                <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-4">
+                  <p className="text-sm font-semibold">🤖 Kibo AI Manager</p>
+                  <div className="mt-2 space-y-1 text-sm text-foreground/90">
+                    <p>{personaGreeting}</p>
+                    <p>{personaTopPoint}</p>
+                    <p>{personaDeliveryPoint}</p>
+                  </div>
+                </div>
+
                 {/* Report Metadata */}
                 <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
                   <p className="text-xs text-muted-foreground">

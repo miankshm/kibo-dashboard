@@ -85,8 +85,8 @@ export const translations = {
       lastYear: '작년',
     },
     aiWidget: {
-      title: 'AI 매출 분석 비서',
-      description: 'AI가 매출 데이터를 분석하여 인사이트를 제공합니다.',
+      title: 'Kibo AI Manager',
+      description: '안녕하세요. Kibo AI Manager가 매출 데이터를 분석해 핵심 인사이트를 전해드립니다.',
       generate: '이번 주 분석 리포트 생성',
       generating: '분석 중...',
       analyzing: '데이터를 분석하고 있습니다...',
@@ -206,8 +206,8 @@ export const translations = {
       lastYear: 'Last year',
     },
     aiWidget: {
-      title: 'AI Sales Analysis Assistant',
-      description: 'AI analyzes sales data and surfaces insights.',
+      title: 'Kibo AI Manager',
+      description: 'Hello. Kibo AI Manager analyzes your sales and highlights key insights.',
       generate: 'Generate this week’s report',
       generating: 'Analyzing...',
       analyzing: 'Analyzing data...',
