@@ -63,6 +63,23 @@ function toDisplayLabel(dateValue: string, language: 'ko' | 'en') {
   return `${weekday}(${date.getMonth() + 1}/${date.getDate()})`
 }
 
+function percentChange(current: number, previous: number) {
+  if (previous === 0) {
+    return null
+  }
+
+  return Number((((current - previous) / previous) * 100).toFixed(1))
+}
+
+function formatPercent(value: number | null) {
+  if (value === null) {
+    return 'N/A'
+  }
+
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${value.toFixed(1)}%`
+}
+
 function isPersistedStoreKey(value: string): value is NonAggregateStoreKey {
   return value === 'st-clair' || value === 'woodbridge'
 }
@@ -604,8 +621,72 @@ export async function createAiReportInDb(params: {
   analysisType: 'weekly' | 'monthly' | 'holiday' | 'cash_flow'
 }): Promise<AIReport> {
   const totals = await getTotals(params.storeKey, params.startDate, params.endDate)
+  const start = startOfDay(new Date(`${params.startDate}T00:00:00`))
+  const end = startOfDay(new Date(`${params.endDate}T00:00:00`))
+  const periodDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+  const previousEnd = addDays(start, -1)
+  const previousStart = addDays(previousEnd, -(periodDays - 1))
+  const previousTotals = await getTotals(params.storeKey, toDateKey(previousStart), toDateKey(previousEnd))
+
+  const [deliveryRow] = await db
+    .select({
+      uberEats: sql<number>`coalesce(sum(${sales.uberEatsSales}), 0)`,
+      doorDash: sql<number>`coalesce(sum(${sales.doordashSales}), 0)`,
+      totalSales: sql<number>`coalesce(sum(${sales.totalSales}), 0)`,
+    })
+    .from(sales)
+    .innerJoin(stores, eq(sales.storeId, stores.id))
+    .where(and(
+      gte(sales.salesDate, params.startDate),
+      lte(sales.salesDate, params.endDate),
+      ...(params.storeKey === 'all' ? [] : [eq(stores.key, params.storeKey)]),
+    ))
+
+  const dailyRows = await db
+    .select({
+      salesDate: sales.salesDate,
+      totalSales: sql<number>`coalesce(sum(${sales.totalSales}), 0)`,
+    })
+    .from(sales)
+    .innerJoin(stores, eq(sales.storeId, stores.id))
+    .where(and(
+      gte(sales.salesDate, params.startDate),
+      lte(sales.salesDate, params.endDate),
+      ...(params.storeKey === 'all' ? [] : [eq(stores.key, params.storeKey)]),
+    ))
+    .groupBy(sales.salesDate)
+
+  const weekdayMap = new Map<string, number>()
+  for (const row of dailyRows) {
+    const weekday = new Intl.DateTimeFormat('ko-KR', { weekday: 'long' }).format(new Date(`${row.salesDate}T00:00:00`))
+    const current = weekdayMap.get(weekday) ?? 0
+    weekdayMap.set(weekday, current + asNumber(row.totalSales))
+  }
+
+  const weekdayStats = Array.from(weekdayMap.entries())
+    .map(([weekday, amount]) => ({
+      weekday,
+      amount,
+      ratio: totals.totalSales === 0 ? 0 : Number(((amount / totals.totalSales) * 100).toFixed(1)),
+    }))
+    .sort((a, b) => b.amount - a.amount)
+
+  const topWeekday = weekdayStats[0] ?? null
+  const lowWeekday = weekdayStats.length > 0 ? weekdayStats[weekdayStats.length - 1] : null
+
+  const uberEatsSales = asNumber(deliveryRow?.uberEats)
+  const doorDashSales = asNumber(deliveryRow?.doorDash)
+  const deliveryTotalSales = uberEatsSales + doorDashSales
+  const uberShare = totals.totalSales === 0 ? 0 : Number(((uberEatsSales / totals.totalSales) * 100).toFixed(1))
+  const doorDashShare = totals.totalSales === 0 ? 0 : Number(((doorDashSales / totals.totalSales) * 100).toFixed(1))
+  const deliveryShare = totals.totalSales === 0 ? 0 : Number(((deliveryTotalSales / totals.totalSales) * 100).toFixed(1))
+  const platformFeeImpact = Number(((uberEatsSales * (1 - UBER_NET_RATIO)) + (doorDashSales * (1 - DOORDASH_NET_RATIO))).toFixed(2))
+  const deliveryNetAfterFee = Number(((uberEatsSales * UBER_NET_RATIO) + (doorDashSales * DOORDASH_NET_RATIO)).toFixed(2))
+
+  const totalSalesGrowthRate = percentChange(totals.totalSales, previousTotals.totalSales)
+  const netSalesGrowthRate = percentChange(totals.netSales, previousTotals.netSales)
   const label = params.storeKey === 'all' ? '전체 지점' : params.storeKey === 'st-clair' ? 'St. Clair 지점' : 'Woodbridge 지점'
-  const summary = `${label} 기준 ${params.analysisType} 분석 리포트입니다.\n\n• 기간: ${params.startDate} ~ ${params.endDate}\n• 총매출: ${Math.round(totals.totalSales).toLocaleString()}\n• 순매출: ${Math.round(totals.netSales).toLocaleString()}\n• 예상 현금 대비 실제 현금 차액: ${Math.round(totals.actualCash - totals.expectedCash).toLocaleString()}`
+  const summary = `${label} 기준 ${params.analysisType} 분석 리포트입니다.\n\n[매출 요약]\n• 기간: ${params.startDate} ~ ${params.endDate}\n• 총매출: ${Math.round(totals.totalSales).toLocaleString()}\n• 순매출: ${Math.round(totals.netSales).toLocaleString()}\n• 전주 대비 총매출 증감률: ${formatPercent(totalSalesGrowthRate)}\n• 전주 대비 순매출 증감률: ${formatPercent(netSalesGrowthRate)}\n\n[요일 분석]\n• 최고 매출 요일: ${topWeekday ? `${topWeekday.weekday} (${Math.round(topWeekday.amount).toLocaleString()}, ${topWeekday.ratio}%)` : '데이터 없음'}\n• 최저 매출 요일: ${lowWeekday ? `${lowWeekday.weekday} (${Math.round(lowWeekday.amount).toLocaleString()}, ${lowWeekday.ratio}%)` : '데이터 없음'}\n• 요일별 매출 비중: ${weekdayStats.length > 0 ? weekdayStats.map((item) => `${item.weekday} ${item.ratio}%`).join(', ') : '데이터 없음'}\n\n[배달앱 분석]\n• Uber Eats 매출 비중: ${uberShare}%\n• DoorDash 매출 비중: ${doorDashShare}%\n• 배달앱 전체 매출 비중: ${deliveryShare}%\n• 플랫폼 수수료 영향(총): ${Math.round(platformFeeImpact).toLocaleString()}\n• 수수료 반영 후 배달앱 순매출: ${Math.round(deliveryNetAfterFee).toLocaleString()} (Uber 23%, DoorDash 15%)\n\n• 예상 현금 대비 실제 현금 차액: ${Math.round(totals.actualCash - totals.expectedCash).toLocaleString()}`
   const store = params.storeKey === 'all' ? null : await getStoreByKey(params.storeKey)
 
   const [report] = await db
@@ -621,6 +702,21 @@ export async function createAiReportInDb(params: {
         netSales: totals.netSales,
         actualCash: totals.actualCash,
         expectedCash: totals.expectedCash,
+        totalSalesGrowthRate,
+        netSalesGrowthRate,
+        topWeekday,
+        lowWeekday,
+        weekdayDistribution: weekdayStats,
+        delivery: {
+          uberEatsSales,
+          doorDashSales,
+          deliveryTotalSales,
+          uberShare,
+          doorDashShare,
+          deliveryShare,
+          platformFeeImpact,
+          deliveryNetAfterFee,
+        },
       },
       generatedByModel: 'GPT-5.4',
     })
