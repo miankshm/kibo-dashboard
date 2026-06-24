@@ -15,7 +15,7 @@ import {
   Tooltip,
 } from 'chart.js'
 import { Chart } from 'react-chartjs-2'
-import { Banknote, CreditCard, Store as StoreIcon, TrendingDown, TrendingUp, Truck } from 'lucide-react'
+import { Banknote, CreditCard, Package, Store as StoreIcon, TrendingDown, TrendingUp, Truck } from 'lucide-react'
 import { getDashboardTrends } from '@/lib/api/dashboard'
 import { getSalesList } from '@/lib/api/sales'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -41,7 +41,7 @@ interface SalesSlide {
   date: string
   total: number
   cards: Array<{
-    key: 'storeVisits' | 'cardSales' | 'cashSales' | 'deliverySales'
+    key: 'storeVisits' | 'cardSales' | 'cashSales' | 'deliverySales' | 'cashAndCarrySales'
     value: number
     change: number
   }>
@@ -108,6 +108,8 @@ function buildSlides(entries: SaleRecord[], salesMode: SalesMode): SalesSlide[] 
     const previousDeliverySales = previousEntry
       ? calculateDeliveryValue(previousEntry)
       : undefined
+    const cashAndCarrySales = entry.cashAndCarrySales
+    const previousCashAndCarrySales = previousEntry?.cashAndCarrySales
 
     return {
       date: entry.salesDate,
@@ -117,6 +119,7 @@ function buildSlides(entries: SaleRecord[], salesMode: SalesMode): SalesSlide[] 
         { key: 'cardSales', value: entry.cardSales, change: calculateChange(entry.cardSales, previousEntry?.cardSales) },
         { key: 'cashSales', value: entry.cashSales, change: calculateChange(entry.cashSales, previousEntry?.cashSales) },
         { key: 'deliverySales', value: deliverySales, change: calculateChange(deliverySales, previousDeliverySales) },
+        { key: 'cashAndCarrySales', value: cashAndCarrySales, change: calculateChange(cashAndCarrySales, previousCashAndCarrySales) },
       ],
     }
   })
@@ -368,7 +371,7 @@ export function SalesSummary() {
           <CarouselContent>
             {slides.map((slide) => (
               <CarouselItem key={slide.date}>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                   <SalesCard
                     title={text.salesSummary.storeVisits}
                     value={`$${formatCurrencyAmount(slide.cards[0]?.value ?? 0, language)}`}
@@ -392,6 +395,12 @@ export function SalesSummary() {
                     value={`$${formatCurrencyAmount(slide.cards[3]?.value ?? 0, language)}`}
                     change={slide.cards[3]?.change ?? 0}
                     icon={Truck}
+                  />
+                  <SalesCard
+                    title={text.salesSummary.cashAndCarrySales}
+                    value={`$${formatCurrencyAmount(slide.cards[4]?.value ?? 0, language)}`}
+                    change={slide.cards[4]?.change ?? 0}
+                    icon={Package}
                   />
                 </div>
               </CarouselItem>
