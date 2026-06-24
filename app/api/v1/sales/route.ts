@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { listSalesFromDb, upsertSaleInDb } from '@/lib/db-queries'
 import type { DailySalesInput, NonAggregateStoreKey, StoreKey } from '@/lib/types'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 function isStoreKey(value: string | null): value is StoreKey {
   return value === 'all' || value === 'st-clair' || value === 'woodbridge'
 }

@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
 import { enUS, ko } from 'date-fns/locale'
-import { CalendarIcon, Loader2, Save } from 'lucide-react'
+import { AlertCircle, CalendarIcon, Loader2, Save } from 'lucide-react'
 import {
   Sheet,
   SheetContent,
@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useWorkflow } from '@/contexts/workflow-context'
 import { cn } from '@/lib/utils'
 import { type ClipboardEvent, type FocusEvent, type KeyboardEvent, type MouseEvent, type WheelEvent, useEffect, useState } from 'react'
@@ -76,11 +77,12 @@ const getDefaultFormValues = (): FormValues => ({
 })
 
 export function DailySalesForm() {
-  const { drawerState, closeDrawer, resetDailySalesFormData, recordDailySalesEntry } = useWorkflow()
+  const { drawerState, closeDrawer, resetDailySalesFormData, recordDailySalesEntry, dailySalesEntries, dataVersion } = useWorkflow()
   const { selectedStoreId, language } = useStore()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const text = getTranslation(language)
   const dateLocale = language === 'ko' ? ko : enUS
   const selectedStore = STORES.find((store) => store.id === selectedStoreId)
@@ -143,36 +145,100 @@ export function DailySalesForm() {
 
   const watchedDate = form.watch('date')
   const watchedStoreId = form.watch('storeId')
-  const resolvedStoreIdForLookup: StoreId | undefined =
+  const watchedDateKey = watchedDate ? format(watchedDate, 'yyyy-MM-dd') : ''
+  const resolvedStoreIdForLookup: FormValues['storeId'] =
     selectedStoreId === 'all' ? watchedStoreId : selectedStoreId
 
-  useEffect(() => {
-    if (!drawerState.dailySalesForm) return
+  const getFormStoreId = (storeId?: FormValues['storeId']) => (
+    selectedStoreId === 'all' ? storeId : undefined
+  )
 
-    const lastSelectedStore = form.getValues('storeId')
-    setIsEditMode(false)
+  const findCachedEntry = (date: Date, storeId?: FormValues['storeId']) => {
+    if (!storeId) return undefined
+
+    const salesDate = format(date, 'yyyy-MM-dd')
+    return dailySalesEntries.find((entry) => (
+      entry.storeId === storeId &&
+      entry.date &&
+      format(entry.date, 'yyyy-MM-dd') === salesDate
+    ))
+  }
+
+  const applyEntryToForm = (
+    date: Date,
+    storeId: FormValues['storeId'],
+    entry: {
+      cardSales: number
+      cashSales: number
+      uberEatsSales: number
+      doorDashSales: number
+      cashAndCarrySales: number
+      tips: number
+      actualClosingCash: number
+    }
+  ) => {
     form.reset({
-      ...getDefaultFormValues(),
-      storeId: selectedStoreId === 'all' ? lastSelectedStore : undefined,
+      date,
+      storeId: getFormStoreId(storeId),
+      cardSales: entry.cardSales,
+      cashSales: entry.cashSales,
+      uberEatsSales: entry.uberEatsSales,
+      doorDashSales: entry.doorDashSales,
+      cashAndCarrySales: entry.cashAndCarrySales,
+      tips: entry.tips,
+      actualClosingCash: entry.actualClosingCash,
     })
-    setIsDatePickerOpen(false)
-  }, [drawerState.dailySalesForm, selectedStoreId, form])
+  }
+
+  const resetFormForDate = (date: Date, storeId?: FormValues['storeId']) => {
+    form.reset({
+      date,
+      storeId: getFormStoreId(storeId),
+      cardSales: 0,
+      cashSales: 0,
+      uberEatsSales: 0,
+      doorDashSales: 0,
+      cashAndCarrySales: 0,
+      tips: 0,
+      actualClosingCash: 0,
+    })
+  }
 
   useEffect(() => {
     if (!drawerState.dailySalesForm) return
-    if (!watchedDate) return
+
+    const nextDate = new Date()
+    const lastSelectedStore = form.getValues('storeId')
+    const cachedEntry = findCachedEntry(nextDate, lastSelectedStore)
+
+    setLoadError(null)
+    setIsEditMode(false)
+    if (cachedEntry) {
+      setIsEditMode(true)
+      applyEntryToForm(nextDate, lastSelectedStore, cachedEntry)
+    } else {
+      resetFormForDate(nextDate, lastSelectedStore)
+    }
+    setIsDatePickerOpen(false)
+  }, [dailySalesEntries, drawerState.dailySalesForm, selectedStoreId, form])
+
+  useEffect(() => {
+    if (!drawerState.dailySalesForm) return
+    if (!watchedDateKey) return
     if (!resolvedStoreIdForLookup) return
 
     let cancelled = false
+    const lookupDate = new Date(`${watchedDateKey}T00:00:00`)
+    const cachedEntry = findCachedEntry(lookupDate, resolvedStoreIdForLookup)
+
+    setLoadError(null)
 
     const loadExistingEntry = async () => {
-      const salesDate = format(watchedDate, 'yyyy-MM-dd')
-
       try {
         const response = await getSalesList({
           storeKey: resolvedStoreIdForLookup,
-          startDate: salesDate,
-          endDate: salesDate,
+          startDate: watchedDateKey,
+          endDate: watchedDateKey,
           limit: 1,
           sortOrder: 'desc',
         })
@@ -182,26 +248,21 @@ export function DailySalesForm() {
         const existingEntry = response.items[0]
         if (!existingEntry) {
           setIsEditMode(false)
-          form.setValue('cardSales', 0)
-          form.setValue('cashSales', 0)
-          form.setValue('uberEatsSales', 0)
-          form.setValue('doorDashSales', 0)
-          form.setValue('cashAndCarrySales', 0)
-          form.setValue('tips', 0)
-          form.setValue('actualClosingCash', 0)
+          resetFormForDate(lookupDate, resolvedStoreIdForLookup)
           return
         }
 
         setIsEditMode(true)
-        form.setValue('cardSales', existingEntry.cardSales)
-        form.setValue('cashSales', existingEntry.cashSales)
-        form.setValue('uberEatsSales', existingEntry.uberEatsSales)
-        form.setValue('doorDashSales', existingEntry.doorDashSales)
-        form.setValue('cashAndCarrySales', existingEntry.cashAndCarrySales)
-        form.setValue('tips', existingEntry.tips)
-        form.setValue('actualClosingCash', existingEntry.actualClosingCash)
+        applyEntryToForm(lookupDate, resolvedStoreIdForLookup, existingEntry)
       } catch {
         if (cancelled) return
+
+        if (cachedEntry) {
+          setIsEditMode(true)
+          applyEntryToForm(lookupDate, resolvedStoreIdForLookup, cachedEntry)
+        }
+
+        setLoadError(text.dailySalesForm.loadFailed)
       }
     }
 
@@ -210,7 +271,7 @@ export function DailySalesForm() {
     return () => {
       cancelled = true
     }
-  }, [drawerState.dailySalesForm, watchedDate, resolvedStoreIdForLookup, form])
+  }, [dataVersion, dailySalesEntries, drawerState.dailySalesForm, watchedDateKey, resolvedStoreIdForLookup, form, text.dailySalesForm.loadFailed])
 
   const onSubmit = async (data: FormValues) => {
     const resolvedStoreId: StoreId | null =
@@ -273,6 +334,14 @@ export function DailySalesForm() {
             onSubmit={form.handleSubmit(onSubmit)}
             className="mt-4 space-y-6 px-4 pb-6 sm:px-6 sm:pb-8"
           >
+            {loadError ? (
+              <Alert variant="destructive">
+                <AlertCircle />
+                <AlertTitle>{text.dailySalesForm.loadFailedTitle}</AlertTitle>
+                <AlertDescription>{loadError}</AlertDescription>
+              </Alert>
+            ) : null}
+
             {selectedStoreId === 'all' ? (
               <FormField
                 control={form.control}
