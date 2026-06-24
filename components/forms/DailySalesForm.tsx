@@ -79,6 +79,7 @@ export function DailySalesForm() {
   const { drawerState, closeDrawer, resetDailySalesFormData, recordDailySalesEntry } = useWorkflow()
   const { selectedStoreId, language } = useStore()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
   const text = getTranslation(language)
   const dateLocale = language === 'ko' ? ko : enUS
@@ -149,6 +150,7 @@ export function DailySalesForm() {
     if (!drawerState.dailySalesForm) return
 
     const lastSelectedStore = form.getValues('storeId')
+    setIsEditMode(false)
     form.reset({
       ...getDefaultFormValues(),
       storeId: selectedStoreId === 'all' ? lastSelectedStore : undefined,
@@ -179,6 +181,7 @@ export function DailySalesForm() {
 
         const existingEntry = response.items[0]
         if (!existingEntry) {
+          setIsEditMode(false)
           form.setValue('cardSales', 0)
           form.setValue('cashSales', 0)
           form.setValue('uberEatsSales', 0)
@@ -189,6 +192,7 @@ export function DailySalesForm() {
           return
         }
 
+        setIsEditMode(true)
         form.setValue('cardSales', existingEntry.cardSales)
         form.setValue('cashSales', existingEntry.cashSales)
         form.setValue('uberEatsSales', existingEntry.uberEatsSales)
@@ -607,12 +611,12 @@ export function DailySalesForm() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {text.dailySalesForm.saving}
+                  {isEditMode ? text.dailySalesForm.updating : text.dailySalesForm.saving}
                 </>
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  {text.dailySalesForm.save}
+                  {isEditMode ? text.dailySalesForm.edit : text.dailySalesForm.save}
                 </>
               )}
             </Button>
