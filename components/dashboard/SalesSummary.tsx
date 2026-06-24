@@ -69,23 +69,54 @@ function formatDate(dateString: string, language: 'ko' | 'en') {
   })
 }
 
-function getChange(dateString: string, offset: number) {
-  const date = new Date(`${dateString}T00:00:00`)
-  const raw = ((date.getDate() * 13 + date.getDay() * 7 + offset) % 26) - 10
-  return Number((raw / 2).toFixed(1))
+function formatCurrencyAmount(value: number, language: 'ko' | 'en') {
+  const locale = language === 'ko' ? 'ko-KR' : 'en-US'
+  const hasFraction = !Number.isInteger(value)
+
+  return value.toLocaleString(locale, {
+    minimumFractionDigits: hasFraction ? 2 : 0,
+    maximumFractionDigits: hasFraction ? 2 : 0,
+  })
 }
 
 function buildSlides(entries: SaleRecord[], salesMode: SalesMode): SalesSlide[] {
-  return entries.map((entry) => {
+  const calculateChange = (current: number, previous: number | undefined) => {
+    if (previous === undefined) return 0
+    if (previous === 0) {
+      return current === 0 ? 0 : 100
+    }
+
+    return Number((((current - previous) / previous) * 100).toFixed(1))
+  }
+
+  const calculateDeliveryValue = (entry: SaleRecord) => {
+    if (salesMode === 'gross') {
+      return entry.uberEatsSales + entry.doorDashSales
+    }
+
+    return entry.uberEatsSales * 0.77 + entry.doorDashSales * 0.85
+  }
+
+  return entries.map((entry, index) => {
+    const previousEntry = index > 0 ? entries[index - 1] : undefined
     const total = salesMode === 'gross' ? entry.totalSales : entry.netSales
+    const storeVisits = entry.cardSales + entry.cashSales
+    const previousStoreVisits = previousEntry
+      ? previousEntry.cardSales + previousEntry.cashSales
+      : undefined
+    const deliverySales = calculateDeliveryValue(entry)
+    const previousDeliverySales = previousEntry
+      ? calculateDeliveryValue(previousEntry)
+      : undefined
+
     return {
       date: entry.salesDate,
       total,
       cards: [
-        { key: 'storeVisits', value: Math.round(total * 0.45), change: getChange(entry.salesDate, 11) },
-        { key: 'cardSales', value: Math.round(total * 0.35), change: getChange(entry.salesDate, 17) },
-        { key: 'cashSales', value: Math.round(total * 0.15), change: getChange(entry.salesDate, 23) },
-        { key: 'deliverySales', value: Math.round(total * 0.2), change: getChange(entry.salesDate, 29) },
+        { key: 'storeVisits', value: storeVisits, change: calculateChange(storeVisits, previousStoreVisits) },
+        { key: 'cardSales', value: entry.cardSales, change: calculateChange(entry.cardSales, previousEntry?.cardSales) },
+        { key: 'cashSales', value: entry.cashSales, change: calculateChange(entry.cashSales, previousEntry?.cashSales) },
+        { key: 'deliverySales', value: deliverySales, change: calculateChange(deliverySales, previousDeliverySales) },
       ],
     }
   })
@@ -281,7 +312,7 @@ export function SalesSummary() {
         padding: 12,
         displayColors: true,
         callbacks: {
-          label: (context: { parsed: { y: number } }) => `$${context.parsed.y.toLocaleString()}`,
+          label: (context: { parsed: { y: number } }) => `$${formatCurrencyAmount(context.parsed.y, language)}`,
         },
       },
     },
@@ -294,7 +325,7 @@ export function SalesSummary() {
         grid: { color: 'oklch(0.922 0 0)' },
         ticks: {
           color: 'oklch(0.556 0 0)',
-          callback: (value: number | string) => `$${Number(value).toLocaleString()}`,
+          callback: (value: number | string) => `$${formatCurrencyAmount(Number(value), language)}`,
         },
       },
     },
@@ -308,7 +339,7 @@ export function SalesSummary() {
           <p className="text-muted-foreground">
             {text.salesSummary.totalLabel}{' '}
             <span className="text-xl font-bold text-foreground">
-              ${displayTotal.toLocaleString()}
+              ${formatCurrencyAmount(displayTotal, language)}
             </span>
           </p>
           <p className="mt-0.5 text-sm text-muted-foreground">
@@ -340,25 +371,25 @@ export function SalesSummary() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <SalesCard
                     title={text.salesSummary.storeVisits}
-                    value={`$${slide.cards[0]?.value.toLocaleString() ?? '0'}`}
+                    value={`$${formatCurrencyAmount(slide.cards[0]?.value ?? 0, language)}`}
                     change={slide.cards[0]?.change ?? 0}
                     icon={StoreIcon}
                   />
                   <SalesCard
                     title={text.salesSummary.cardSales}
-                    value={`$${slide.cards[1]?.value.toLocaleString() ?? '0'}`}
+                    value={`$${formatCurrencyAmount(slide.cards[1]?.value ?? 0, language)}`}
                     change={slide.cards[1]?.change ?? 0}
                     icon={CreditCard}
                   />
                   <SalesCard
                     title={text.salesSummary.cashSales}
-                    value={`$${slide.cards[2]?.value.toLocaleString() ?? '0'}`}
+                    value={`$${formatCurrencyAmount(slide.cards[2]?.value ?? 0, language)}`}
                     change={slide.cards[2]?.change ?? 0}
                     icon={Banknote}
                   />
                   <SalesCard
                     title={text.salesSummary.deliverySales}
-                    value={`$${slide.cards[3]?.value.toLocaleString() ?? '0'}`}
+                    value={`$${formatCurrencyAmount(slide.cards[3]?.value ?? 0, language)}`}
                     change={slide.cards[3]?.change ?? 0}
                     icon={Truck}
                   />
@@ -378,7 +409,7 @@ export function SalesSummary() {
               <CardTitle>{text.salesSummary.trendTitle}</CardTitle>
               <CardDescription>
                 <span className="font-medium text-foreground">
-                  {cumulativeSalesLabel} ${Math.round(chartPeriodTotal).toLocaleString()}
+                  {cumulativeSalesLabel} ${formatCurrencyAmount(chartPeriodTotal, language)}
                 </span>
               </CardDescription>
             </div>
