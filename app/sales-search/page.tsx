@@ -25,16 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { STORES, type StoreId } from '@/store/useStore'
 import { getSalesList } from '@/lib/api/sales'
@@ -57,11 +49,6 @@ function formatDisplayDate(date: Date | string) {
   return format(date, 'yyyy-MM-dd')
 }
 
-function getStoreLabel(storeId: SearchStore) {
-  const store = STORES.find((item) => item.id === storeId)
-  return store?.name.ko ?? storeId
-}
-
 function getRecordStoreLabel(storeKey: SaleRecord['storeKey']) {
   if (storeKey === 'st-clair') return 'St. Clair'
   if (storeKey === 'woodbridge') return 'Woodbridge'
@@ -78,8 +65,6 @@ export default function SalesSearchPage() {
   const [selectedStore, setSelectedStore] = useState<SearchStore>('all')
   const [salesMode, setSalesMode] = useState<SalesMode>('gross')
   const [results, setResults] = useState<SaleRecord[]>([])
-  const [selectedRow, setSelectedRow] = useState<SaleRecord | null>(null)
-  const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -118,15 +103,6 @@ export default function SalesSearchPage() {
       setIsLoading(false)
     }
   }
-
-  const openDetail = (row: SaleRecord) => {
-    setSelectedRow(row)
-    setIsDetailOpen(true)
-  }
-
-  const selectedDeliveryTotal = selectedRow
-    ? selectedRow.uberEatsSales + selectedRow.doorDashSales
-    : 0
 
   return (
     <div className="relative min-h-screen bg-background">
@@ -263,17 +239,14 @@ export default function SalesSearchPage() {
                         <TableHead className={cn('text-right', salesMode === 'net' && 'text-primary')}>순매출(Net)</TableHead>
                         <TableHead className="text-right">카드결제</TableHead>
                         <TableHead className="text-right">현금결제</TableHead>
-                        <TableHead className="text-right">배달앱</TableHead>
+                        <TableHead className="text-right">Uber Eats</TableHead>
+                        <TableHead className="text-right">DoorDash</TableHead>
                         <TableHead className="text-right">Cash & Carry</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {results.map((row) => (
-                        <TableRow
-                          key={row.id}
-                          onClick={() => openDetail(row)}
-                          className="cursor-pointer"
-                        >
+                        <TableRow key={row.id}>
                           <TableCell>{formatDisplayDate(row.salesDate)}</TableCell>
                           <TableCell>{getRecordStoreLabel(row.storeKey)}</TableCell>
                           <TableCell className={cn('text-right', salesMode === 'gross' && 'font-semibold text-primary')}>
@@ -284,7 +257,8 @@ export default function SalesSearchPage() {
                           </TableCell>
                           <TableCell className="text-right">{formatCurrency(row.cardSales)}</TableCell>
                           <TableCell className="text-right">{formatCurrency(row.cashSales)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(row.uberEatsSales + row.doorDashSales)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(row.uberEatsSales)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(row.doorDashSales)}</TableCell>
                           <TableCell className="text-right">{formatCurrency(row.cashAndCarrySales)}</TableCell>
                         </TableRow>
                       ))}
@@ -294,97 +268,6 @@ export default function SalesSearchPage() {
               </CardContent>
             </Card>
           </div>
-
-          <Sheet open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-            <SheetContent side="right" className="w-full sm:max-w-md">
-              <SheetHeader>
-                <SheetTitle>
-                  {selectedRow
-                    ? `${formatDisplayDate(selectedRow.salesDate)} · ${getRecordStoreLabel(selectedRow.storeKey)}`
-                    : '매출 상세'}
-                </SheetTitle>
-                <SheetDescription>선택한 날짜의 실제 매출 상세 데이터입니다.</SheetDescription>
-              </SheetHeader>
-
-              {selectedRow ? (
-                <div className="space-y-3 px-4 pb-6">
-                  <div className="flex items-center justify-between rounded-lg border p-3">
-                    <span className="text-sm text-muted-foreground">조회 매장</span>
-                    <Badge variant="secondary">{getStoreLabel(selectedRow.storeKey)}</Badge>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">Gross</p>
-                        <p className="text-sm font-semibold">{formatCurrency(selectedRow.totalSales)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">Net</p>
-                        <p className="text-sm font-semibold">{formatCurrency(selectedRow.netSales)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">카드결제</p>
-                        <p className="text-sm font-semibold">{formatCurrency(selectedRow.cardSales)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">현금결제</p>
-                        <p className="text-sm font-semibold">{formatCurrency(selectedRow.cashSales)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">Uber Eats</p>
-                        <p className="text-sm font-semibold">{formatCurrency(selectedRow.uberEatsSales)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">DoorDash</p>
-                        <p className="text-sm font-semibold">{formatCurrency(selectedRow.doorDashSales)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">배달앱 합계</p>
-                        <p className="text-sm font-semibold">{formatCurrency(selectedDeliveryTotal)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">Cash & Carry</p>
-                        <p className="text-sm font-semibold">{formatCurrency(selectedRow.cashAndCarrySales)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">Paid Out</p>
-                        <p className="text-sm font-semibold">{formatCurrency(selectedRow.tips)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">예상 마감 현금</p>
-                        <p className="text-sm font-semibold">{formatCurrency(selectedRow.expectedCash)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="col-span-2">
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">실제 마감 현금</p>
-                        <p className="text-sm font-semibold">{formatCurrency(selectedRow.actualClosingCash)}</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              ) : null}
-            </SheetContent>
-          </Sheet>
         </PageContainer>
       </div>
     </div>
