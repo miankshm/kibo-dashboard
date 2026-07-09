@@ -1,6 +1,7 @@
 'use client'
 
 import { LayoutDashboard, TrendingUp, Wallet, Calendar, FileInput, Database, Settings, X } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useStore } from '@/store/useStore'
@@ -8,40 +9,70 @@ import { useWorkflow } from '@/contexts/workflow-context'
 import { cn } from '@/lib/utils'
 import { getTranslation } from '@/lib/i18n'
 
+const DASHBOARD_PATH = '/'
+
 interface NavItem {
   icon: React.ElementType
   label: string
-  href: string
-  action?: () => void
+  href?: string
+  sectionId?: string
+  drawer?: 'dailySalesForm' | 'aiWidget'
 }
 
 export function Sidebar() {
   const { isSidebarOpen, setSidebarOpen, language } = useStore()
   const { openDrawer } = useWorkflow()
+  const router = useRouter()
+  const pathname = usePathname()
   const text = getTranslation(language)
 
   const navItems: NavItem[] = [
-    { icon: LayoutDashboard, label: text.sidebar.dashboard, href: '#dashboard' },
-    { icon: TrendingUp, label: text.sidebar.salesSummary, href: '#sales' },
-    { icon: Wallet, label: text.sidebar.cashFlow, href: '#cashflow' },
-    { icon: Calendar, label: text.sidebar.holidayComparison, href: '#holiday' },
+    { icon: LayoutDashboard, label: text.sidebar.dashboard, sectionId: 'dashboard' },
+    { icon: TrendingUp, label: text.sidebar.salesSummary, sectionId: 'sales' },
+    { icon: Wallet, label: text.sidebar.cashFlow, sectionId: 'cashflow' },
+    { icon: Calendar, label: text.sidebar.holidayComparison, sectionId: 'holiday' },
     { icon: Database, label: text.sidebar.dataLoad, href: '/data-load' },
-    {
-      icon: FileInput,
-      label: text.sidebar.dailySalesInput,
-      href: '#',
-      action: () => {
-        openDrawer('dailySalesForm')
-        setSidebarOpen(false)
-      },
-    },
-    { icon: Settings, label: text.sidebar.settings, href: '#settings' },
+    { icon: FileInput, label: text.sidebar.dailySalesInput, drawer: 'dailySalesForm' },
+    { icon: Settings, label: text.sidebar.settings, sectionId: 'settings' },
   ]
 
+  const navigateToDashboardSection = (sectionId: string) => {
+    const hash = `#${sectionId}`
+
+    if (pathname === DASHBOARD_PATH) {
+      const section = document.getElementById(sectionId)
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+      window.history.replaceState(null, '', hash)
+      setSidebarOpen(false)
+      return
+    }
+
+    router.push(`/${hash}`)
+    setSidebarOpen(false)
+  }
+
   const handleNavClick = (item: NavItem) => {
-    if (item.action) {
-      item.action()
-    } else {
+    if (item.drawer === 'dailySalesForm') {
+      if (pathname === DASHBOARD_PATH) {
+        openDrawer('dailySalesForm')
+        setSidebarOpen(false)
+        return
+      }
+
+      router.push('/?openDrawer=dailySalesForm#dashboard')
+      setSidebarOpen(false)
+      return
+    }
+
+    if (item.sectionId) {
+      navigateToDashboardSection(item.sectionId)
+      return
+    }
+
+    if (item.href) {
+      router.push(item.href)
       setSidebarOpen(false)
     }
   }
@@ -51,11 +82,9 @@ export function Sidebar() {
       {navItems.map((item) => (
         <a
           key={item.label}
-          href={item.href}
+          href={item.sectionId ? `#${item.sectionId}` : item.href ?? '#'}
           onClick={(e) => {
-            if (item.action) {
-              e.preventDefault()
-            }
+            e.preventDefault()
             handleNavClick(item)
           }}
           className={cn(

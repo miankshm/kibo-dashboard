@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Header } from '@/components/layout/Header'
@@ -17,7 +19,20 @@ import { getTranslation } from '@/lib/i18n'
 export default function DashboardPage() {
   const { openDrawer } = useWorkflow()
   const language = useStore((state) => state.language)
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const text = getTranslation(language)
+
+  useEffect(() => {
+    const drawer = searchParams.get('openDrawer')
+    if (drawer !== 'dailySalesForm') {
+      return
+    }
+
+    openDrawer('dailySalesForm')
+    const hash = window.location.hash
+    router.replace(hash ? `/${hash}` : '/', { scroll: false })
+  }, [openDrawer, router, searchParams])
 
   return (
     <div className="relative min-h-screen bg-background">
