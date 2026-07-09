@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { UseEmblaCarouselType } from 'embla-carousel-react'
 import {
   BarElement,
@@ -173,6 +173,7 @@ export function SalesSummary() {
   const { showGrossSales, toggleSalesMode, selectedPeriod, setSelectedPeriod, dataVersion } = useWorkflow()
   const { selectedStoreId, language } = useStore()
   const text = getTranslation(language)
+  const selectedSlideDateRef = useRef<string | null>(null)
   const [carouselApi, setCarouselApi] = useState<CarouselApi>()
   const [currentIndex, setCurrentIndex] = useState(0)
   const [slides, setSlides] = useState<SalesSlide[]>([])
@@ -191,6 +192,10 @@ export function SalesSummary() {
       carouselApi.off('select', onSelect)
     }
   }, [carouselApi])
+
+  useEffect(() => {
+    selectedSlideDateRef.current = slides[currentIndex]?.date ?? null
+  }, [currentIndex, slides])
 
   useEffect(() => {
     let isMounted = true
@@ -245,10 +250,15 @@ export function SalesSummary() {
   useEffect(() => {
     if (slides.length === 0) {
       setCurrentIndex(0)
+      selectedSlideDateRef.current = null
       return
     }
 
-    const nextIndex = slides.length - 1
+    const matchedIndex = selectedSlideDateRef.current
+      ? slides.findIndex((slide) => slide.date === selectedSlideDateRef.current)
+      : -1
+    const nextIndex = matchedIndex >= 0 ? matchedIndex : slides.length - 1
+
     setCurrentIndex(nextIndex)
     carouselApi?.scrollTo(nextIndex, true)
   }, [slides, carouselApi])
@@ -359,10 +369,7 @@ export function SalesSummary() {
       </div>
 
       <div className="relative px-10">
-        <Carousel
-          setApi={setCarouselApi}
-          opts={{ startIndex: Math.max(slides.length - 1, 0) }}
-        >
+        <Carousel setApi={setCarouselApi}>
           <CarouselContent>
             {slides.map((slide) => (
               <CarouselItem key={slide.date}>
