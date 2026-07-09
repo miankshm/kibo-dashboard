@@ -64,11 +64,21 @@ export default function SalesSearchPage() {
   const [endDate, setEndDate] = useState<Date | undefined>(new Date())
   const [selectedStore, setSelectedStore] = useState<SearchStore>('all')
   const [salesMode, setSalesMode] = useState<SalesMode>('gross')
+  const [appliedSalesMode, setAppliedSalesMode] = useState<SalesMode>('gross')
   const [results, setResults] = useState<SaleRecord[]>([])
+  const [hasSearched, setHasSearched] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const hasSearched = useMemo(() => results.length > 0 || errorMessage !== null, [results.length, errorMessage])
+  const isNetApplied = useMemo(() => appliedSalesMode === 'net', [appliedSalesMode])
+
+  const getUberEatsDisplayValue = (row: SaleRecord) => (
+    isNetApplied ? row.uberEatsSales * 0.77 : row.uberEatsSales
+  )
+
+  const getDoorDashDisplayValue = (row: SaleRecord) => (
+    isNetApplied ? row.doorDashSales * 0.85 : row.doorDashSales
+  )
 
   const handleSearch = async () => {
     if (!startDate || !endDate) {
@@ -96,9 +106,12 @@ export default function SalesSearchPage() {
       })
 
       setResults(response.items)
+      setAppliedSalesMode(salesMode)
+      setHasSearched(true)
     } catch {
       setResults([])
       setErrorMessage('매출 데이터를 조회하지 못했습니다. 잠시 후 다시 시도해주세요.')
+      setHasSearched(true)
     } finally {
       setIsLoading(false)
     }
@@ -206,7 +219,7 @@ export default function SalesSearchPage() {
                   <CardTitle>검색 결과</CardTitle>
                   <CardDescription>
                     {hasSearched
-                      ? `${results.length}건 조회됨 · 표시 기준: ${salesMode === 'gross' ? 'Gross' : 'Net'}`
+                      ? `${results.length}건 조회됨 · 표시 기준: ${appliedSalesMode === 'gross' ? 'Gross' : 'Net'}`
                       : '조건을 선택하고 검색 버튼을 눌러주세요.'}
                   </CardDescription>
                 </div>
@@ -235,8 +248,8 @@ export default function SalesSearchPage() {
                       <TableRow>
                         <TableHead>날짜</TableHead>
                         <TableHead>매장</TableHead>
-                        <TableHead className={cn('text-right', salesMode === 'gross' && 'text-primary')}>총매출(Gross)</TableHead>
-                        <TableHead className={cn('text-right', salesMode === 'net' && 'text-primary')}>순매출(Net)</TableHead>
+                        <TableHead className={cn('text-right', appliedSalesMode === 'gross' && 'text-primary')}>총매출(Gross)</TableHead>
+                        <TableHead className={cn('text-right', appliedSalesMode === 'net' && 'text-primary')}>순매출(Net)</TableHead>
                         <TableHead className="text-right">카드결제</TableHead>
                         <TableHead className="text-right">현금결제</TableHead>
                         <TableHead className="text-right">Uber Eats</TableHead>
@@ -249,16 +262,16 @@ export default function SalesSearchPage() {
                         <TableRow key={row.id}>
                           <TableCell>{formatDisplayDate(row.salesDate)}</TableCell>
                           <TableCell>{getRecordStoreLabel(row.storeKey)}</TableCell>
-                          <TableCell className={cn('text-right', salesMode === 'gross' && 'font-semibold text-primary')}>
+                          <TableCell className={cn('text-right', appliedSalesMode === 'gross' && 'font-semibold text-primary')}>
                             {formatCurrency(row.totalSales)}
                           </TableCell>
-                          <TableCell className={cn('text-right', salesMode === 'net' && 'font-semibold text-primary')}>
+                          <TableCell className={cn('text-right', appliedSalesMode === 'net' && 'font-semibold text-primary')}>
                             {formatCurrency(row.netSales)}
                           </TableCell>
                           <TableCell className="text-right">{formatCurrency(row.cardSales)}</TableCell>
                           <TableCell className="text-right">{formatCurrency(row.cashSales)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(row.uberEatsSales)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(row.doorDashSales)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(getUberEatsDisplayValue(row))}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(getDoorDashDisplayValue(row))}</TableCell>
                           <TableCell className="text-right">{formatCurrency(row.cashAndCarrySales)}</TableCell>
                         </TableRow>
                       ))}
