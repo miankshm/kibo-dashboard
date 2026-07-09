@@ -6,6 +6,7 @@ import type {
   HolidayComparisonData,
   HolidayListItem,
   SaleRecord,
+  SalesRestRecord,
   StoreOption,
   UpcomingHoliday,
 } from '@/lib/types/domain'
@@ -49,3 +50,5 @@ export type HolidaysResponse = ApiSuccess<HolidayListItem[]>
 export type UpcomingHolidaysResponse = ApiSuccess<UpcomingHoliday[]>
 export type HolidayComparisonResponse = ApiSuccess<HolidayComparisonData>
 export type AIAnalyzeResponse = ApiSuccess<AIReport>
+export type SalesRestListResponse = ApiSuccess<PaginatedResponse<SalesRestRecord>>
+export type SalesRestUpsertResponse = ApiSuccess<SalesRestRecord & { isUpsert: boolean }>

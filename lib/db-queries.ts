@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 
 import { db } from '@/lib/db'
-import { aiAnalysisReports, eventMasters, events, sales, stores } from '@/lib/schema'
+import { aiAnalysisReports, eventMasters, events, sales, salesRest, stores } from '@/lib/schema'
 import type {
   AIReport,
   CashAnalysisData,
@@ -17,6 +17,8 @@ import type {
   SaleRecord,
   SalesMode,
   SalesPeriod,
+  SalesRestInput,
+  SalesRestRecord,
   StoreKey,
   StoreOption,
   UpcomingHoliday,
@@ -729,4 +731,126 @@ export async function createAiReportInDb(params: {
     generatedAt: report.createdAt?.toISOString() ?? new Date().toISOString(),
     insights,
   }
+}
+
+// ─── sales_rest ────────────────────────────────────────────────────────────────
+
+function toSalesRestRecord(row: typeof salesRest.$inferSelect): SalesRestRecord {
+  return {
+    id: row.id,
+    saleDate: row.saleDate,
+    dayOfWeek: row.dayOfWeek ?? '',
+    grossSale: asNumber(row.grossSale),
+    cardWithoutTips: asNumber(row.cardWithoutTips),
+    paidOut: asNumber(row.paidOut),
+    cardWithTips: asNumber(row.cardWithTips),
+    cashSale: asNumber(row.cashSale),
+    ubereatsSale: asNumber(row.ubereatsSale),
+    doordashSale: asNumber(row.doordashSale),
+    cashAndCarry: asNumber(row.cashAndCarry),
+    totalSale: asNumber(row.totalSale),
+    cashExpenses: asNumber(row.cashExpenses),
+    cashLeft: row.cashLeft != null ? asNumber(row.cashLeft) : null,
+    actualCash: row.actualCash != null ? asNumber(row.actualCash) : null,
+    totalCash: row.totalCash != null ? asNumber(row.totalCash) : null,
+    balance: row.balance != null ? asNumber(row.balance) : null,
+    ubereatsFee: asNumber(row.ubereatsFee),
+    doordashFee: asNumber(row.doordashFee),
+    totalCommissions: asNumber(row.totalCommissions),
+    totalSaleAfterCommission: asNumber(row.totalSaleAfterCommission),
+    createdAt: row.createdAt?.toISOString() ?? new Date().toISOString(),
+    updatedAt: row.updatedAt?.toISOString() ?? new Date().toISOString(),
+  }
+}
+
+export async function listSalesRestFromDb(params: {
+  startDate?: string
+  endDate?: string
+  page?: number
+  limit?: number
+  sortOrder?: 'asc' | 'desc'
+}): Promise<{ items: SalesRestRecord[]; total: number }> {
+  const page = Math.max(1, params.page ?? 1)
+  const limit = Math.min(200, Math.max(1, params.limit ?? 30))
+  const offset = (page - 1) * limit
+  const order = params.sortOrder === 'asc' ? asc(salesRest.saleDate) : desc(salesRest.saleDate)
+
+  const conditions = [
+    params.startDate ? gte(salesRest.saleDate, params.startDate) : undefined,
+    params.endDate ? lte(salesRest.saleDate, params.endDate) : undefined,
+  ].filter(Boolean) as ReturnType<typeof gte>[]
+
+  const [rows, [countRow]] = await Promise.all([
+    db
+      .select()
+      .from(salesRest)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(order)
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(salesRest)
+      .where(conditions.length ? and(...conditions) : undefined),
+  ])
+
+  return {
+    items: rows.map(toSalesRestRecord),
+    total: countRow?.count ?? 0,
+  }
+}
+
+export async function upsertSalesRestInDb(input: SalesRestInput): Promise<SalesRestRecord> {
+  const [row] = await db
+    .insert(salesRest)
+    .values({
+      saleDate: input.saleDate,
+      dayOfWeek: input.dayOfWeek ?? null,
+      grossSale: input.grossSale ?? 0,
+      cardWithoutTips: input.cardWithoutTips ?? 0,
+      paidOut: input.paidOut ?? 0,
+      cardWithTips: input.cardWithTips ?? 0,
+      cashSale: input.cashSale ?? 0,
+      ubereatsSale: input.ubereatsSale ?? 0,
+      doordashSale: input.doordashSale ?? 0,
+      cashAndCarry: input.cashAndCarry ?? 0,
+      totalSale: input.totalSale ?? 0,
+      cashExpenses: input.cashExpenses ?? 0,
+      cashLeft: input.cashLeft ?? null,
+      actualCash: input.actualCash ?? null,
+      totalCash: input.totalCash ?? null,
+      balance: input.balance ?? null,
+      ubereatsFee: input.ubereatsFee ?? 0,
+      doordashFee: input.doordashFee ?? 0,
+      totalCommissions: input.totalCommissions ?? 0,
+      totalSaleAfterCommission: input.totalSaleAfterCommission ?? 0,
+    })
+    .onConflictDoUpdate({
+      target: salesRest.saleDate,
+      set: {
+        dayOfWeek: sql`excluded.day_of_week`,
+        grossSale: sql`excluded.gross_sale`,
+        cardWithoutTips: sql`excluded.card_without_tips`,
+        paidOut: sql`excluded.paid_out`,
+        cardWithTips: sql`excluded.card_with_tips`,
+        cashSale: sql`excluded.cash_sale`,
+        ubereatsSale: sql`excluded.ubereats_sale`,
+        doordashSale: sql`excluded.doordash_sale`,
+        cashAndCarry: sql`excluded.cash_and_carry`,
+        totalSale: sql`excluded.total_sale`,
+        cashExpenses: sql`excluded.cash_expenses`,
+        cashLeft: sql`excluded.cash_left`,
+        actualCash: sql`excluded.actual_cash`,
+        totalCash: sql`excluded.total_cash`,
+        balance: sql`excluded.balance`,
+        ubereatsFee: sql`excluded.ubereats_fee`,
+        doordashFee: sql`excluded.doordash_fee`,
+        totalCommissions: sql`excluded.total_commissions`,
+        totalSaleAfterCommission: sql`excluded.total_sale_after_commission`,
+        updatedAt: sql`now()`,
+      },
+    })
+    .returning()
+
+  return toSalesRestRecord(row)
 }

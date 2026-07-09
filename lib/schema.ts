@@ -154,3 +154,32 @@ export const weatherSnapshots = pgTable('weather_snapshots', {
   precipitation: numeric('precipitation', { precision: 5, scale: 2, mode: 'number' }),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
 })
+
+export const salesRest = pgTable('sales_rest', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  saleDate: date('sale_date', { mode: 'string' }).notNull(),
+  dayOfWeek: varchar('day_of_week', { length: 20 }),
+  grossSale: numeric('gross_sale', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  cardWithoutTips: numeric('card_without_tips', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  paidOut: numeric('paid_out', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  cardWithTips: numeric('card_with_tips', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  cashSale: numeric('cash_sale', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  ubereatsSale: numeric('ubereats_sale', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  doordashSale: numeric('doordash_sale', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  cashAndCarry: numeric('cash_and_carry', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  totalSale: numeric('total_sale', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  cashExpenses: numeric('cash_expenses', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  cashLeft: numeric('cash_left', { precision: 12, scale: 2, mode: 'number' }),
+  actualCash: numeric('actual_cash', { precision: 12, scale: 2, mode: 'number' }),
+  totalCash: numeric('total_cash', { precision: 12, scale: 2, mode: 'number' }),
+  balance: numeric('balance', { precision: 12, scale: 2, mode: 'number' }),
+  ubereatsFee: numeric('ubereats_fee', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  doordashFee: numeric('doordash_fee', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  totalCommissions: numeric('total_commissions', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  totalSaleAfterCommission: numeric('total_sale_after_commission', { precision: 12, scale: 2, mode: 'number' }).default(0),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
+}, (table) => ({
+  saleDateUnique: unique('sales_rest_sale_date_key').on(table.saleDate),
+  saleDateIndex: index('idx_sales_rest_sale_date').on(table.saleDate),
+}))

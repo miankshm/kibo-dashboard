@@ -151,3 +151,32 @@ export interface AIReportInsights {
   weekdayDistribution: AIWeekdayStat[]
   delivery: AIDeliveryInsights
 }
+
+export interface SalesRestInput {
+  saleDate: string
+  dayOfWeek?: string
+  grossSale?: number
+  cardWithoutTips?: number
+  paidOut?: number
+  cardWithTips?: number
+  cashSale?: number
+  ubereatsSale?: number
+  doordashSale?: number
+  cashAndCarry?: number
+  totalSale?: number
+  cashExpenses?: number
+  cashLeft?: number | null
+  actualCash?: number | null
+  totalCash?: number | null
+  balance?: number | null
+  ubereatsFee?: number
+  doordashFee?: number
+  totalCommissions?: number
+  totalSaleAfterCommission?: number
+}
+
+export interface SalesRestRecord extends Required<SalesRestInput> {
+  id: string
+  createdAt: string
+  updatedAt: string
+}

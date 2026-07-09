@@ -1,6 +1,6 @@
 'use client'
 
-import { LayoutDashboard, TrendingUp, Wallet, Calendar, FileInput, Settings, X } from 'lucide-react'
+import { LayoutDashboard, TrendingUp, Wallet, Calendar, FileInput, Database, Settings, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useStore } from '@/store/useStore'
@@ -25,6 +25,7 @@ export function Sidebar() {
     { icon: TrendingUp, label: text.sidebar.salesSummary, href: '#sales' },
     { icon: Wallet, label: text.sidebar.cashFlow, href: '#cashflow' },
     { icon: Calendar, label: text.sidebar.holidayComparison, href: '#holiday' },
+    { icon: Database, label: text.sidebar.dataLoad, href: '/data-load' },
     {
       icon: FileInput,
       label: text.sidebar.dailySalesInput,
