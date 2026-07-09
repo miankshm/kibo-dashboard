@@ -15,7 +15,7 @@ import {
   Tooltip,
 } from 'chart.js'
 import { Chart } from 'react-chartjs-2'
-import { Banknote, CreditCard, Package, Store as StoreIcon, TrendingDown, TrendingUp, Truck } from 'lucide-react'
+import { Banknote, CreditCard, Package, TrendingDown, TrendingUp, Truck } from 'lucide-react'
 import { getDashboardTrends } from '@/lib/api/dashboard'
 import { getSalesList } from '@/lib/api/sales'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -41,7 +41,7 @@ interface SalesSlide {
   date: string
   total: number
   cards: Array<{
-    key: 'storeVisits' | 'cardSales' | 'cashSales' | 'deliverySales' | 'cashAndCarrySales'
+    key: 'cardSales' | 'cashSales' | 'deliverySales' | 'cashAndCarrySales'
     value: number
     change: number
   }>
@@ -100,10 +100,6 @@ function buildSlides(entries: SaleRecord[], salesMode: SalesMode): SalesSlide[] 
   return entries.map((entry, index) => {
     const previousEntry = index > 0 ? entries[index - 1] : undefined
     const total = salesMode === 'gross' ? entry.totalSales : entry.netSales
-    const storeVisits = entry.cardSales + entry.cashSales
-    const previousStoreVisits = previousEntry
-      ? previousEntry.cardSales + previousEntry.cashSales
-      : undefined
     const deliverySales = calculateDeliveryValue(entry)
     const previousDeliverySales = previousEntry
       ? calculateDeliveryValue(previousEntry)
@@ -115,7 +111,6 @@ function buildSlides(entries: SaleRecord[], salesMode: SalesMode): SalesSlide[] 
       date: entry.salesDate,
       total,
       cards: [
-        { key: 'storeVisits', value: storeVisits, change: calculateChange(storeVisits, previousStoreVisits) },
         { key: 'cardSales', value: entry.cardSales, change: calculateChange(entry.cardSales, previousEntry?.cardSales) },
         { key: 'cashSales', value: entry.cashSales, change: calculateChange(entry.cashSales, previousEntry?.cashSales) },
         { key: 'deliverySales', value: deliverySales, change: calculateChange(deliverySales, previousDeliverySales) },
@@ -371,35 +366,29 @@ export function SalesSummary() {
           <CarouselContent>
             {slides.map((slide) => (
               <CarouselItem key={slide.date}>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                  <SalesCard
-                    title={text.salesSummary.storeVisits}
-                    value={`$${formatCurrencyAmount(slide.cards[0]?.value ?? 0, language)}`}
-                    change={slide.cards[0]?.change ?? 0}
-                    icon={StoreIcon}
-                  />
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <SalesCard
                     title={text.salesSummary.cardSales}
-                    value={`$${formatCurrencyAmount(slide.cards[1]?.value ?? 0, language)}`}
-                    change={slide.cards[1]?.change ?? 0}
+                    value={`$${formatCurrencyAmount(slide.cards[0]?.value ?? 0, language)}`}
+                    change={slide.cards[0]?.change ?? 0}
                     icon={CreditCard}
                   />
                   <SalesCard
                     title={text.salesSummary.cashSales}
-                    value={`$${formatCurrencyAmount(slide.cards[2]?.value ?? 0, language)}`}
-                    change={slide.cards[2]?.change ?? 0}
+                    value={`$${formatCurrencyAmount(slide.cards[1]?.value ?? 0, language)}`}
+                    change={slide.cards[1]?.change ?? 0}
                     icon={Banknote}
                   />
                   <SalesCard
                     title={text.salesSummary.deliverySales}
-                    value={`$${formatCurrencyAmount(slide.cards[3]?.value ?? 0, language)}`}
-                    change={slide.cards[3]?.change ?? 0}
+                    value={`$${formatCurrencyAmount(slide.cards[2]?.value ?? 0, language)}`}
+                    change={slide.cards[2]?.change ?? 0}
                     icon={Truck}
                   />
                   <SalesCard
                     title={text.salesSummary.cashAndCarrySales}
-                    value={`$${formatCurrencyAmount(slide.cards[4]?.value ?? 0, language)}`}
-                    change={slide.cards[4]?.change ?? 0}
+                    value={`$${formatCurrencyAmount(slide.cards[3]?.value ?? 0, language)}`}
+                    change={slide.cards[3]?.change ?? 0}
                     icon={Package}
                   />
                 </div>
