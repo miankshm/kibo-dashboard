@@ -23,6 +23,7 @@ export const translations = {
       holidayComparison: '홀리데이 비교',
       dataLoad: '데이터 로드',
       dailySalesInput: '일일 매출 입력',
+      salesSearch: '매출검색',
       settings: '설정',
     },
     storeSelector: {
@@ -150,6 +151,7 @@ export const translations = {
       holidayComparison: 'Holiday Comparison',
       dataLoad: 'Data Load',
       dailySalesInput: 'Daily Sales Entry',
+      salesSearch: 'Sales Search',
       settings: 'Settings',
     },
     storeSelector: {
