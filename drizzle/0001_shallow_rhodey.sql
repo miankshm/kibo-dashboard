@@ -1,0 +1,32 @@
+CREATE TABLE "sales_records_new" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"sale_date" date NOT NULL,
+	"day_of_week" varchar(20),
+	"gross_sale" numeric(18, 6) DEFAULT 0,
+	"card_without_tips" numeric(18, 6) DEFAULT 0,
+	"paid_out" numeric(18, 6) DEFAULT 0,
+	"card_with_tips" numeric(18, 6) DEFAULT 0,
+	"cash_sale_incl_gross" numeric(18, 6) DEFAULT 0,
+	"ubereats" numeric(18, 6) DEFAULT 0,
+	"doordash" numeric(18, 6) DEFAULT 0,
+	"cash_and_carry" numeric(18, 6) DEFAULT 0,
+	"total_sale" numeric(18, 6) DEFAULT 0,
+	"cash_expenses" numeric(18, 6) DEFAULT 0,
+	"cash_left" numeric(18, 6) DEFAULT 0,
+	"actual_cash" numeric(18, 6) DEFAULT 0,
+	"total_cash" numeric(18, 6) DEFAULT 0,
+	"balance" numeric(18, 6) DEFAULT 0,
+	"ubereats_commission_rate" numeric(18, 6) DEFAULT 0,
+	"ubereats_commission" numeric(18, 6) DEFAULT 0,
+	"doordash_commission_rate" numeric(18, 6) DEFAULT 0,
+	"doordash_commission" numeric(18, 6) DEFAULT 0,
+	"total_commissions" numeric(18, 6) DEFAULT 0,
+	"total_sale_after_commission" numeric(18, 6) DEFAULT 0,
+	"weekly_total_sales" numeric(18, 6) DEFAULT 0,
+	"weekly_cash_total" numeric(18, 6) DEFAULT 0,
+	"weekly_sales_after_commission" numeric(18, 6) DEFAULT 0,
+	"updated_at" timestamp DEFAULT now(),
+	CONSTRAINT "sales_records_new_sale_date_key" UNIQUE("sale_date")
+);
+--> statement-breakpoint
+CREATE INDEX "idx_sales_records_new_sale_date" ON "sales_records_new" USING btree ("sale_date");
