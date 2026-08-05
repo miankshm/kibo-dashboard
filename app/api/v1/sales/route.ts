@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { listSalesFromDb, upsertSaleInDb } from '@/lib/db-queries'
+import { deleteSaleInDb, listSalesFromDb, upsertSaleInDb } from '@/lib/db-queries'
 import type { DailySalesInput, NonAggregateStoreKey, StoreKey } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -78,5 +78,42 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Failed to upsert sale', error)
     return NextResponse.json({ success: false, message: 'Failed to save sale' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const queryId = searchParams.get('id')
+    let bodyId: string | undefined
+
+    if (!queryId) {
+      try {
+        const body = (await request.json()) as { id?: string }
+        bodyId = body.id
+      } catch {
+        bodyId = undefined
+      }
+    }
+
+    const id = queryId ?? bodyId
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: 'id is required', errors: [{ field: 'id', message: 'id is required' }] },
+        { status: 400 },
+      )
+    }
+
+    const deleted = await deleteSaleInDb(id)
+
+    if (!deleted) {
+      return NextResponse.json({ success: false, message: 'Sale record not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, data: { id, deleted: true } })
+  } catch (error) {
+    console.error('Failed to delete sale', error)
+    return NextResponse.json({ success: false, message: 'Failed to delete sale' }, { status: 500 })
   }
 }

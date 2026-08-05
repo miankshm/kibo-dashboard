@@ -186,6 +186,7 @@ export const salesRest = pgTable('sales_rest', {
 
 export const salesRecordsNew = pgTable('sales_records_new', {
   id: uuid('id').defaultRandom().primaryKey(),
+  storeId: uuid('store_id').notNull().references(() => stores.id),
   saleDate: date('sale_date', { mode: 'string' }).notNull(),
   dayOfWeek: varchar('day_of_week', { length: 20 }),
   grossSale: numeric('gross_sale', { precision: 18, scale: 6, mode: 'number' }).default(0),
@@ -213,6 +214,7 @@ export const salesRecordsNew = pgTable('sales_records_new', {
   weeklySalesAfterCommission: numeric('weekly_sales_after_commission', { precision: 18, scale: 6, mode: 'number' }).default(0),
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 }, (table) => ({
-  saleDateUnique: unique('sales_records_new_sale_date_key').on(table.saleDate),
+  storeDateUnique: unique('sales_records_new_store_id_sale_date_key').on(table.storeId, table.saleDate),
+  storeDateIndex: index('idx_sales_records_new_store_date').on(table.storeId, table.saleDate),
   saleDateIndex: index('idx_sales_records_new_sale_date').on(table.saleDate),
 }))

@@ -18,3 +18,9 @@ export async function getSalesList(params: {
 }) {
   return requestJson<PaginatedResponse<SaleRecord>>(buildApiUrl('/api/v1/sales', params))
 }
+
+export async function deleteSalesRecord(id: string) {
+  return requestJson<{ id: string; deleted: boolean }>(buildApiUrl('/api/v1/sales', { id }), {
+    method: 'DELETE',
+  })
+}

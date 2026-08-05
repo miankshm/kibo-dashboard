@@ -32,16 +32,19 @@ const previewRows: PreviewRow[] = [
 
 export default function DataLoadPage() {
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const selectedFileRef = useRef<File | null>(null)
   const [status, setStatus] = useState<UploadStatus>('idle')
   const [fileName, setFileName] = useState('')
   const [fileSize, setFileSize] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
+  const [resultMessage, setResultMessage] = useState('')
   const [isDragActive, setIsDragActive] = useState(false)
 
   const progressValue = status === 'uploading' ? 50 : status === 'done' ? 100 : status === 'selected' ? 0 : 0
 
   async function handleUpload(file: File) {
     setErrorMessage('')
+    setResultMessage('')
 
     if (!file) {
       setErrorMessage('파일이 선택되지 않았습니다.')
@@ -57,18 +60,48 @@ export default function DataLoadPage() {
 
     setFileName(file.name)
     setFileSize(file.size)
+    selectedFileRef.current = file
     setStatus('selected')
   }
 
   async function handleSync() {
     if (status !== 'selected') return
+    if (!selectedFileRef.current) {
+      setErrorMessage('선택된 파일 정보를 찾을 수 없습니다. 파일을 다시 선택해주세요.')
+      return
+    }
 
     setErrorMessage('')
+    setResultMessage('')
     setStatus('uploading')
 
-    await new Promise((resolve) => setTimeout(resolve, 900))
+    try {
+      const formData = new FormData()
+      formData.append('file', selectedFileRef.current)
 
-    setStatus('done')
+      const response = await fetch('/api/v1/data_load/sales/upload', {
+        method: 'POST',
+        body: formData,
+        cache: 'no-store',
+      })
+
+      const payload = await response.json() as {
+        success: boolean
+        message?: string
+      }
+
+      if (!response.ok || !payload.success) {
+        setStatus('selected')
+        setErrorMessage(payload.message ?? '업로드에 실패했습니다. CSV 형식과 헤더를 확인해주세요.')
+        return
+      }
+
+      setStatus('done')
+      setResultMessage(payload.message ?? '업로드가 완료되었습니다.')
+    } catch {
+      setStatus('selected')
+      setErrorMessage('네트워크 오류로 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    }
   }
 
   function handleReset() {
@@ -76,6 +109,8 @@ export default function DataLoadPage() {
     setFileName('')
     setFileSize(0)
     setErrorMessage('')
+    setResultMessage('')
+    selectedFileRef.current = null
     setIsDragActive(false)
     if (inputRef.current) {
       inputRef.current.value = ''
@@ -180,7 +215,7 @@ export default function DataLoadPage() {
                   {status === 'done' && (
                     <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
                       <CheckCircle2 className="h-4 w-4" />
-                      업로드가 완료되었습니다. 데이터가 성공적으로 저장되었습니다.
+                      {resultMessage || '업로드가 완료되었습니다. 데이터가 성공적으로 저장되었습니다.'}
                     </div>
                   )}
 
