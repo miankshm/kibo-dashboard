@@ -15,6 +15,7 @@ export const translations = {
       ai: 'AI 분석',
       theme: '테마 전환',
       language: '언어 전환',
+      logout: '로그아웃',
     },
     sidebar: {
       dashboard: '대시보드',
@@ -142,6 +143,7 @@ export const translations = {
       ai: 'AI Insights',
       theme: 'Toggle theme',
       language: 'Toggle language',
+      logout: 'Sign out',
     },
     sidebar: {
       dashboard: 'Dashboard',

@@ -1,6 +1,7 @@
 'use client'
 
-import { Menu, Moon, Sun, Bot, Languages } from 'lucide-react'
+import { Menu, Moon, Sun, Bot, Languages, LogOut } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useStore } from '@/store/useStore'
 import { useWorkflow } from '@/contexts/workflow-context'
@@ -8,9 +9,21 @@ import { StoreSelector } from '@/components/dashboard/StoreSelector'
 import { getTranslation } from '@/lib/i18n'
 
 export function Header() {
+  const router = useRouter()
   const { toggleSidebar, isDarkMode, toggleDarkMode, language, toggleLanguage } = useStore()
   const { openDrawer } = useWorkflow()
   const text = getTranslation(language)
+
+  async function handleLogout() {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+      })
+    } finally {
+      router.replace('/login')
+      router.refresh()
+    }
+  }
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -76,6 +89,15 @@ export function Header() {
             <span className="sr-only">{text.header.theme}</span>
           </Button>
         </div>
+
+        <Button
+          variant="outline"
+          onClick={handleLogout}
+          className="ml-auto gap-2 px-3 text-sm font-medium"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>{text.header.logout}</span>
+        </Button>
       </div>
     </header>
   )
