@@ -48,8 +48,14 @@ const CHART_RANGE_OPTIONS = {
 
 type ChartRange = keyof typeof CHART_RANGE_OPTIONS
 
-const toDateLabel = (month: number, day: number) =>
-  `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+const usdCurrencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+const formatCurrency = (value: number) => usdCurrencyFormatter.format(value)
 
 const valueLabelPlugin = {
   id: 'valueLabelPlugin',
@@ -70,7 +76,7 @@ const valueLabelPlugin = {
         ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'bottom'
-        ctx.fillText(`$${value.toLocaleString()}`, position.x, labelY)
+        ctx.fillText(formatCurrency(value), position.x, labelY)
         ctx.restore()
       })
     })
@@ -174,7 +180,7 @@ export function HolidayComparison() {
         padding: 12,
         callbacks: {
           label: (context: { dataset: { label: string }; parsed: { y: number } }) =>
-            `${context.dataset.label}: $${context.parsed.y.toLocaleString()}`,
+            `${context.dataset.label}: ${formatCurrency(context.parsed.y)}`,
         },
       },
     },
@@ -189,7 +195,7 @@ export function HolidayComparison() {
         grid: { color: 'oklch(0.922 0 0)' },
         ticks: {
           color: 'oklch(0.556 0 0)',
-          callback: (value: number | string) => `$${Number(value).toLocaleString()}`,
+          callback: (value: number | string) => formatCurrency(Number(value)),
         },
       },
     },
@@ -283,9 +289,6 @@ export function HolidayComparison() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="mb-3 text-sm text-muted-foreground">
-              {text.holiday.recentDate}: {selectedHoliday ? toDateLabel(selectedHoliday.month, selectedHoliday.day) : '-'}
-            </div>
             <div className="h-[400px]">
               <Bar data={chartData} options={chartOptions as object} plugins={[valueLabelPlugin]} />
             </div>
@@ -314,7 +317,7 @@ export function HolidayComparison() {
                       <TableRow key={`${row.year}-${row.date}`}>
                         <TableCell>{row.year}</TableCell>
                         <TableCell>{row.date}</TableCell>
-                        <TableCell className="text-right">${row.sales.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.sales)}</TableCell>
                         <TableCell className="text-right">
                           {row.yoy === null ? (
                             <Badge variant="secondary">-</Badge>

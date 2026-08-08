@@ -102,7 +102,7 @@ export default function SalesSearchPage() {
         startDate: format(startDate, 'yyyy-MM-dd'),
         endDate: format(endDate, 'yyyy-MM-dd'),
         limit: 500,
-        sortOrder: 'desc',
+        sortOrder: 'asc',
       })
 
       setResults(response.items)

@@ -288,10 +288,14 @@ export async function listSalesFromDb(params: {
 }
 
 export async function upsertSaleInDb(input: DailySalesInput) {
-  const store = await getStoreByKey('st-clair')
+  if (!isPersistedStoreKey(input.storeKey)) {
+    throw new Error(`Invalid persisted store key: ${input.storeKey}`)
+  }
+
+  const store = await getStoreByKey(input.storeKey)
 
   if (!store) {
-    throw new Error('Store not found for key: st-clair')
+    throw new Error(`Store not found for key: ${input.storeKey}`)
   }
 
   const totalSales = input.cardSales + input.cashSales + input.uberEatsSales + input.doorDashSales + input.cashAndCarrySales
@@ -593,7 +597,10 @@ export async function getHolidayComparisonFromDb(params: {
   const eventRows = await db
     .select({ eventDate: events.eventDate, year: events.year })
     .from(events)
-    .where(eq(events.eventMasterId, params.holidayId))
+    .where(and(
+      eq(events.eventMasterId, params.holidayId),
+      sql`${events.eventDate} <= current_date`,
+    ))
     .orderBy(desc(events.year))
 
   if (eventRows.length === 0) {
