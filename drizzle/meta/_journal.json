@@ -22,6 +22,13 @@
       "when": 1784592000000,
       "tag": "0002_add_store_id_to_sales_records_new",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786212663977,
+      "tag": "0003_cooing_lord_hawal",
+      "breakpoints": true
     }
   ]
 }

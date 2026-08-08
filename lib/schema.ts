@@ -21,6 +21,7 @@ export const admins = pgTable('admins', {
   name: varchar('name', { length: 100 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   passwordHash: text('password_hash').notNull(),
+  receiveUpdateEmails: boolean('receive_update_emails').default(true),
   isActive: boolean('is_active').default(true),
   invitedBy: uuid('invited_by').references((): AnyPgColumn => admins.id),
   lastLoginAt: timestamp('last_login_at', { mode: 'date' }),
@@ -36,6 +37,19 @@ export const adminInvitations = pgTable('admin_invitations', {
   expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
   acceptedAt: timestamp('accepted_at', { mode: 'date' }),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
+})
+
+export const joinRequests = pgTable('join_requests', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  email: varchar('email', { length: 255 }).notNull(),
+  status: varchar('status', { length: 20 }).default('pending').notNull(),
+  requestedAt: timestamp('requested_at', { mode: 'date' }).defaultNow(),
+  approvedAt: timestamp('approved_at', { mode: 'date' }),
+  approvedByAdminId: uuid('approved_by_admin_id').references(() => admins.id),
+  inviteToken: text('invite_token'),
+  inviteSentAt: timestamp('invite_sent_at', { mode: 'date' }),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
 
 export const stores = pgTable('stores', {

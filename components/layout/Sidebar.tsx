@@ -34,7 +34,7 @@ export function Sidebar() {
     { icon: FileInput, label: text.sidebar.dailySalesInput, drawer: 'dailySalesForm' },
     { icon: Search, label: text.sidebar.salesSearch, href: '/sales-search' },
     { icon: Database, label: text.sidebar.dataLoad, href: '/data-load' },
-    { icon: Settings, label: text.sidebar.settings, sectionId: 'settings' },
+    { icon: Settings, label: text.sidebar.settings, href: '/settings' },
   ]
 
   const navigateToDashboardSection = (sectionId: string) => {

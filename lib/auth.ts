@@ -1,4 +1,5 @@
 export const AUTH_COOKIE_NAME = 'kibo_session'
+export const AUTH_IDENTITY_COOKIE_NAME = 'kibo_identity'
 const AUTH_COOKIE_VALUE = 'authenticated'
 
 export function isAuthenticatedCookie(cookieValue: string | undefined): boolean {

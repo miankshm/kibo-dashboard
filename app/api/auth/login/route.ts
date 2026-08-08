@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
-import { AUTH_COOKIE_NAME, getAuthCookieValue, isValidInternalLogin } from '@/lib/auth'
+import { AUTH_COOKIE_NAME, AUTH_IDENTITY_COOKIE_NAME, getAuthCookieValue, isValidInternalLogin } from '@/lib/auth'
+import { db } from '@/lib/db'
+import { admins } from '@/lib/schema'
+import { verifyPassword } from '@/lib/password'
+import { and, eq } from 'drizzle-orm'
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
@@ -16,8 +20,36 @@ export async function POST(request: Request) {
 
   const username = body.username.trim()
   const password = body.password
+  const normalizedUsername = username.toLowerCase()
 
-  if (!isValidInternalLogin(username, password)) {
+  let isAuthenticated = false
+  let loginIdentity = normalizedUsername
+
+  if (db) {
+    const foundAdmins = await db
+      .select()
+      .from(admins)
+      .where(and(eq(admins.email, username.toLowerCase()), eq(admins.isActive, true)))
+      .limit(1)
+
+    if (foundAdmins.length > 0) {
+      isAuthenticated = verifyPassword(password, foundAdmins[0].passwordHash)
+
+      if (isAuthenticated) {
+        loginIdentity = foundAdmins[0].email
+        await db
+          .update(admins)
+          .set({ lastLoginAt: new Date(), updatedAt: new Date() })
+          .where(eq(admins.id, foundAdmins[0].id))
+      }
+    }
+  }
+
+  if (!isAuthenticated) {
+    isAuthenticated = isValidInternalLogin(username, password)
+  }
+
+  if (!isAuthenticated) {
     return NextResponse.json(
       {
         success: false,
@@ -34,7 +66,13 @@ export async function POST(request: Request) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 12,
+  })
+
+  response.cookies.set(AUTH_IDENTITY_COOKIE_NAME, loginIdentity, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
   })
 
   return response
