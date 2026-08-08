@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 
 import { db } from '@/lib/db'
-import { aiAnalysisReports, eventMasters, events, sales, salesRest, stores } from '@/lib/schema'
+import { aiAnalysisReports, eventMasters, events, salesRecordsNew, stores } from '@/lib/schema'
 import type {
   AIReport,
   CashAnalysisData,
@@ -154,16 +154,16 @@ async function getStoreByKey(storeKey: NonAggregateStoreKey) {
 async function getTotals(storeKey: StoreKey, startDate: string, endDate: string) {
   const [row] = await db
     .select({
-      totalSales: sql<number>`coalesce(sum(${sales.totalSales}), 0)`,
-      netSales: sql<number>`coalesce(sum(${sales.netSales}), 0)`,
-      expectedCash: sql<number>`coalesce(sum(${sales.expectedCashAmount}), 0)`,
-      actualCash: sql<number>`coalesce(sum(${sales.actualClosingCash}), 0)`,
+      totalSales: sql<number>`coalesce(sum(${salesRecordsNew.totalSale}), 0)`,
+      netSales: sql<number>`coalesce(sum(${salesRecordsNew.totalSaleAfterCommission}), 0)`,
+      expectedCash: sql<number>`coalesce(sum(${salesRecordsNew.cashSaleInclGross} - ${salesRecordsNew.paidOut}), 0)`,
+      actualCash: sql<number>`coalesce(sum(${salesRecordsNew.actualCash}), 0)`,
     })
-    .from(sales)
-    .innerJoin(stores, eq(sales.storeId, stores.id))
+    .from(salesRecordsNew)
+    .innerJoin(stores, eq(salesRecordsNew.storeId, stores.id))
     .where(and(
-      gte(sales.salesDate, startDate),
-      lte(sales.salesDate, endDate),
+      gte(salesRecordsNew.saleDate, startDate),
+      lte(salesRecordsNew.saleDate, endDate),
       ...(storeKey === 'all' ? [] : [eq(stores.key, storeKey)]),
     ))
 
@@ -178,22 +178,22 @@ async function getTotals(storeKey: StoreKey, startDate: string, endDate: string)
 async function getDailyAggregates(storeKey: StoreKey, startDate: string, endDate: string) {
   const rows = await db
     .select({
-      salesDate: sales.salesDate,
-      totalSales: sql<number>`coalesce(sum(${sales.totalSales}), 0)`,
-      netSales: sql<number>`coalesce(sum(${sales.netSales}), 0)`,
-      expectedCash: sql<number>`coalesce(sum(${sales.expectedCashAmount}), 0)`,
-      actualCash: sql<number>`coalesce(sum(${sales.actualClosingCash}), 0)`,
-      difference: sql<number>`coalesce(sum(${sales.cashDifference}), 0)`,
+      salesDate: salesRecordsNew.saleDate,
+      totalSales: sql<number>`coalesce(sum(${salesRecordsNew.totalSale}), 0)`,
+      netSales: sql<number>`coalesce(sum(${salesRecordsNew.totalSaleAfterCommission}), 0)`,
+      expectedCash: sql<number>`coalesce(sum(${salesRecordsNew.cashSaleInclGross} - ${salesRecordsNew.paidOut}), 0)`,
+      actualCash: sql<number>`coalesce(sum(${salesRecordsNew.actualCash}), 0)`,
+      difference: sql<number>`coalesce(sum(${salesRecordsNew.balance}), 0)`,
     })
-    .from(sales)
-    .innerJoin(stores, eq(sales.storeId, stores.id))
+    .from(salesRecordsNew)
+    .innerJoin(stores, eq(salesRecordsNew.storeId, stores.id))
     .where(and(
-      gte(sales.salesDate, startDate),
-      lte(sales.salesDate, endDate),
+      gte(salesRecordsNew.saleDate, startDate),
+      lte(salesRecordsNew.saleDate, endDate),
       ...(storeKey === 'all' ? [] : [eq(stores.key, storeKey)]),
     ))
-    .groupBy(sales.salesDate)
-    .orderBy(asc(sales.salesDate))
+    .groupBy(salesRecordsNew.saleDate)
+    .orderBy(asc(salesRecordsNew.saleDate))
 
   return rows.map((row) => ({
     salesDate: row.salesDate,
@@ -235,10 +235,10 @@ export async function listSalesFromDb(params: {
   const filters = []
 
   if (params.startDate) {
-    filters.push(gte(sales.salesDate, params.startDate))
+    filters.push(gte(salesRecordsNew.saleDate, params.startDate))
   }
   if (params.endDate) {
-    filters.push(lte(sales.salesDate, params.endDate))
+    filters.push(lte(salesRecordsNew.saleDate, params.endDate))
   }
   if ((params.storeKey ?? 'all') !== 'all') {
     filters.push(eq(stores.key, params.storeKey as NonAggregateStoreKey))
@@ -248,32 +248,32 @@ export async function listSalesFromDb(params: {
 
   const [countRow] = await db
     .select({ count: sql<number>`count(*)::int` })
-    .from(sales)
-    .innerJoin(stores, eq(sales.storeId, stores.id))
+    .from(salesRecordsNew)
+    .innerJoin(stores, eq(salesRecordsNew.storeId, stores.id))
     .where(whereClause)
 
   const rows = await db
     .select({
-      id: sales.id,
+      id: salesRecordsNew.id,
       storeKey: stores.key,
-      salesDate: sales.salesDate,
-      cardSales: sales.cardSales,
-      cashSales: sales.cashSales,
-      uberEatsSales: sales.uberEatsSales,
-      doordashSales: sales.doordashSales,
-      cashAndCarrySales: sales.cashAndCarrySales,
-      cardTip: sales.cardTip,
-      actualClosingCash: sales.actualClosingCash,
-      totalSales: sales.totalSales,
-      netSales: sales.netSales,
-      expectedCashAmount: sales.expectedCashAmount,
-      cashDifference: sales.cashDifference,
-      note: sales.note,
+      salesDate: salesRecordsNew.saleDate,
+      cardSales: salesRecordsNew.cardWithoutTips,
+      cashSales: salesRecordsNew.cashSaleInclGross,
+      uberEatsSales: salesRecordsNew.ubereats,
+      doordashSales: salesRecordsNew.doordash,
+      cashAndCarrySales: salesRecordsNew.cashAndCarry,
+      cardTip: salesRecordsNew.paidOut,
+      actualClosingCash: salesRecordsNew.actualCash,
+      totalSales: salesRecordsNew.totalSale,
+      netSales: salesRecordsNew.totalSaleAfterCommission,
+      expectedCashAmount: sql<number>`coalesce(${salesRecordsNew.cashSaleInclGross} - ${salesRecordsNew.paidOut}, 0)`,
+      cashDifference: salesRecordsNew.balance,
+      note: sql<string | null>`null`,
     })
-    .from(sales)
-    .innerJoin(stores, eq(sales.storeId, stores.id))
+    .from(salesRecordsNew)
+    .innerJoin(stores, eq(salesRecordsNew.storeId, stores.id))
     .where(whereClause)
-    .orderBy(params.sortOrder === 'asc' ? asc(sales.salesDate) : desc(sales.salesDate))
+    .orderBy(params.sortOrder === 'asc' ? asc(salesRecordsNew.saleDate) : desc(salesRecordsNew.saleDate))
     .limit(limit)
     .offset((page - 1) * limit)
 
@@ -288,10 +288,10 @@ export async function listSalesFromDb(params: {
 }
 
 export async function upsertSaleInDb(input: DailySalesInput) {
-  const store = await getStoreByKey(input.storeKey)
+  const store = await getStoreByKey('st-clair')
 
   if (!store) {
-    throw new Error(`Store not found for key: ${input.storeKey}`)
+    throw new Error('Store not found for key: st-clair')
   }
 
   const totalSales = input.cardSales + input.cashSales + input.uberEatsSales + input.doorDashSales + input.cashAndCarrySales
@@ -305,65 +305,99 @@ export async function upsertSaleInDb(input: DailySalesInput) {
     (input.doorDashSales * DOORDASH_NET_RATIO)
   ).toFixed(2))
 
+  const ubereatsCommission = Number((input.uberEatsSales * (1 - UBER_NET_RATIO)).toFixed(2))
+  const doordashCommission = Number((input.doorDashSales * (1 - DOORDASH_NET_RATIO)).toFixed(2))
+  const totalCommissions = Number((ubereatsCommission + doordashCommission).toFixed(2))
+  const ubereatsCommissionRate = input.uberEatsSales > 0 ? Number((ubereatsCommission / input.uberEatsSales).toFixed(6)) : 0
+  const doordashCommissionRate = input.doorDashSales > 0 ? Number((doordashCommission / input.doorDashSales).toFixed(6)) : 0
+  const dayOfWeek = new Date(`${input.salesDate}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+
   const [row] = await db
-    .insert(sales)
+    .insert(salesRecordsNew)
     .values({
       storeId: store.id,
-      salesDate: input.salesDate,
-      cardSales: input.cardSales,
-      cashSales: input.cashSales,
-      uberEatsSales: input.uberEatsSales,
-      doordashSales: input.doorDashSales,
-      cashAndCarrySales: input.cashAndCarrySales,
-      cardTip: input.tips,
-      actualClosingCash: input.actualClosingCash,
-      expectedCashAmount,
-      cashDifference,
-      totalSales,
-      netSales,
-      note: input.note,
+      saleDate: input.salesDate,
+      dayOfWeek,
+      grossSale: totalSales,
+      cardWithoutTips: input.cardSales,
+      paidOut: input.tips,
+      cardWithTips: input.cardSales + input.tips,
+      cashSaleInclGross: input.cashSales,
+      ubereats: input.uberEatsSales,
+      doordash: input.doorDashSales,
+      cashAndCarry: input.cashAndCarrySales,
+      totalSale: totalSales,
+      cashExpenses: 0,
+      cashLeft: expectedCashAmount,
+      actualCash: input.actualClosingCash,
+      totalCash: input.actualClosingCash,
+      balance: cashDifference,
+      ubereatsCommissionRate,
+      ubereatsCommission,
+      doordashCommissionRate,
+      doordashCommission,
+      totalCommissions,
+      totalSaleAfterCommission: netSales,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
-      target: [sales.storeId, sales.salesDate],
+      target: [salesRecordsNew.storeId, salesRecordsNew.saleDate],
       set: {
-        cardSales: input.cardSales,
-        cashSales: input.cashSales,
-        uberEatsSales: input.uberEatsSales,
-        doordashSales: input.doorDashSales,
-        cashAndCarrySales: input.cashAndCarrySales,
-        cardTip: input.tips,
-        actualClosingCash: input.actualClosingCash,
-        expectedCashAmount,
-        cashDifference,
-        totalSales,
-        netSales,
-        note: input.note,
+        dayOfWeek,
+        grossSale: totalSales,
+        cardWithoutTips: input.cardSales,
+        paidOut: input.tips,
+        cardWithTips: input.cardSales + input.tips,
+        cashSaleInclGross: input.cashSales,
+        ubereats: input.uberEatsSales,
+        doordash: input.doorDashSales,
+        cashAndCarry: input.cashAndCarrySales,
+        totalSale: totalSales,
+        cashExpenses: 0,
+        cashLeft: expectedCashAmount,
+        actualCash: input.actualClosingCash,
+        totalCash: input.actualClosingCash,
+        balance: cashDifference,
+        ubereatsCommissionRate,
+        ubereatsCommission,
+        doordashCommissionRate,
+        doordashCommission,
+        totalCommissions,
+        totalSaleAfterCommission: netSales,
         updatedAt: new Date(),
       },
     })
     .returning({
-      id: sales.id,
+      id: salesRecordsNew.id,
       storeKey: sql<string>`${store.key}`,
-      salesDate: sales.salesDate,
-      cardSales: sales.cardSales,
-      cashSales: sales.cashSales,
-      uberEatsSales: sales.uberEatsSales,
-      doordashSales: sales.doordashSales,
-      cashAndCarrySales: sales.cashAndCarrySales,
-      cardTip: sales.cardTip,
-      actualClosingCash: sales.actualClosingCash,
-      totalSales: sales.totalSales,
-      netSales: sales.netSales,
-      expectedCashAmount: sales.expectedCashAmount,
-      cashDifference: sales.cashDifference,
-      note: sales.note,
+      salesDate: salesRecordsNew.saleDate,
+      cardSales: salesRecordsNew.cardWithoutTips,
+      cashSales: salesRecordsNew.cashSaleInclGross,
+      uberEatsSales: salesRecordsNew.ubereats,
+      doordashSales: salesRecordsNew.doordash,
+      cashAndCarrySales: salesRecordsNew.cashAndCarry,
+      cardTip: salesRecordsNew.paidOut,
+      actualClosingCash: salesRecordsNew.actualCash,
+      totalSales: salesRecordsNew.totalSale,
+      netSales: salesRecordsNew.totalSaleAfterCommission,
+      expectedCashAmount: sql<number>`coalesce(${salesRecordsNew.cashSaleInclGross} - ${salesRecordsNew.paidOut}, 0)`,
+      cashDifference: salesRecordsNew.balance,
+      note: sql<string | null>`null`,
     })
 
   return {
     ...toSaleRecord(row),
     storeId: store.id,
   }
+}
+
+export async function deleteSaleInDb(id: string): Promise<boolean> {
+  const rows = await db
+    .delete(salesRecordsNew)
+    .where(eq(salesRecordsNew.id, id))
+    .returning({ id: salesRecordsNew.id })
+
+  return rows.length > 0
 }
 
 export async function getDashboardSummaryFromDb(params: {
@@ -573,14 +607,14 @@ export async function getHolidayComparisonFromDb(params: {
   }
 
   const salesRows = await db
-    .select({ salesDate: sales.salesDate, totalSales: sql<number>`coalesce(sum(${sales.totalSales}), 0)` })
-    .from(sales)
-    .innerJoin(stores, eq(sales.storeId, stores.id))
+    .select({ salesDate: salesRecordsNew.saleDate, totalSales: sql<number>`coalesce(sum(${salesRecordsNew.totalSale}), 0)` })
+    .from(salesRecordsNew)
+    .innerJoin(stores, eq(salesRecordsNew.storeId, stores.id))
     .where(and(
-      inArray(sales.salesDate, eventRows.map((row) => row.eventDate)),
+      inArray(salesRecordsNew.saleDate, eventRows.map((row) => row.eventDate)),
       ...(params.storeKey === 'all' ? [] : [eq(stores.key, params.storeKey)]),
     ))
-    .groupBy(sales.salesDate)
+    .groupBy(salesRecordsNew.saleDate)
 
   const salesByDate = new Map(salesRows.map((row) => [row.salesDate, row.totalSales]))
   const history = eventRows.map((row, index) => {
@@ -632,31 +666,31 @@ export async function createAiReportInDb(params: {
 
   const [deliveryRow] = await db
     .select({
-      uberEats: sql<number>`coalesce(sum(${sales.uberEatsSales}), 0)`,
-      doorDash: sql<number>`coalesce(sum(${sales.doordashSales}), 0)`,
-      totalSales: sql<number>`coalesce(sum(${sales.totalSales}), 0)`,
+      uberEats: sql<number>`coalesce(sum(${salesRecordsNew.ubereats}), 0)`,
+      doorDash: sql<number>`coalesce(sum(${salesRecordsNew.doordash}), 0)`,
+      totalSales: sql<number>`coalesce(sum(${salesRecordsNew.totalSale}), 0)`,
     })
-    .from(sales)
-    .innerJoin(stores, eq(sales.storeId, stores.id))
+    .from(salesRecordsNew)
+    .innerJoin(stores, eq(salesRecordsNew.storeId, stores.id))
     .where(and(
-      gte(sales.salesDate, params.startDate),
-      lte(sales.salesDate, params.endDate),
+      gte(salesRecordsNew.saleDate, params.startDate),
+      lte(salesRecordsNew.saleDate, params.endDate),
       ...(params.storeKey === 'all' ? [] : [eq(stores.key, params.storeKey)]),
     ))
 
   const dailyRows = await db
     .select({
-      salesDate: sales.salesDate,
-      totalSales: sql<number>`coalesce(sum(${sales.totalSales}), 0)`,
+      salesDate: salesRecordsNew.saleDate,
+      totalSales: sql<number>`coalesce(sum(${salesRecordsNew.totalSale}), 0)`,
     })
-    .from(sales)
-    .innerJoin(stores, eq(sales.storeId, stores.id))
+    .from(salesRecordsNew)
+    .innerJoin(stores, eq(salesRecordsNew.storeId, stores.id))
     .where(and(
-      gte(sales.salesDate, params.startDate),
-      lte(sales.salesDate, params.endDate),
+      gte(salesRecordsNew.saleDate, params.startDate),
+      lte(salesRecordsNew.saleDate, params.endDate),
       ...(params.storeKey === 'all' ? [] : [eq(stores.key, params.storeKey)]),
     ))
-    .groupBy(sales.salesDate)
+    .groupBy(salesRecordsNew.saleDate)
 
   const weekdayMap = new Map<string, number>()
   for (const row of dailyRows) {
@@ -735,7 +769,7 @@ export async function createAiReportInDb(params: {
 
 // ─── sales_rest ────────────────────────────────────────────────────────────────
 
-function toSalesRestRecord(row: typeof salesRest.$inferSelect): SalesRestRecord {
+function toSalesRestRecord(row: typeof salesRecordsNew.$inferSelect): SalesRestRecord {
   return {
     id: row.id,
     saleDate: row.saleDate,
@@ -744,22 +778,22 @@ function toSalesRestRecord(row: typeof salesRest.$inferSelect): SalesRestRecord 
     cardWithoutTips: asNumber(row.cardWithoutTips),
     paidOut: asNumber(row.paidOut),
     cardWithTips: asNumber(row.cardWithTips),
-    cashSale: asNumber(row.cashSale),
-    ubereatsSale: asNumber(row.ubereatsSale),
-    doordashSale: asNumber(row.doordashSale),
+    cashSale: asNumber(row.cashSaleInclGross),
+    ubereatsSale: asNumber(row.ubereats),
+    doordashSale: asNumber(row.doordash),
     cashAndCarry: asNumber(row.cashAndCarry),
     totalSale: asNumber(row.totalSale),
     cashExpenses: asNumber(row.cashExpenses),
-    cashLeft: row.cashLeft != null ? asNumber(row.cashLeft) : null,
-    actualCash: row.actualCash != null ? asNumber(row.actualCash) : null,
-    totalCash: row.totalCash != null ? asNumber(row.totalCash) : null,
-    balance: row.balance != null ? asNumber(row.balance) : null,
-    ubereatsFee: asNumber(row.ubereatsFee),
-    doordashFee: asNumber(row.doordashFee),
+    cashLeft: asNumber(row.cashLeft),
+    actualCash: asNumber(row.actualCash),
+    totalCash: asNumber(row.totalCash),
+    balance: asNumber(row.balance),
+    ubereatsFee: asNumber(row.ubereatsCommission),
+    doordashFee: asNumber(row.doordashCommission),
     totalCommissions: asNumber(row.totalCommissions),
     totalSaleAfterCommission: asNumber(row.totalSaleAfterCommission),
-    createdAt: row.createdAt?.toISOString() ?? new Date().toISOString(),
     updatedAt: row.updatedAt?.toISOString() ?? new Date().toISOString(),
+    createdAt: row.updatedAt?.toISOString() ?? new Date().toISOString(),
   }
 }
 
@@ -773,24 +807,30 @@ export async function listSalesRestFromDb(params: {
   const page = Math.max(1, params.page ?? 1)
   const limit = Math.min(200, Math.max(1, params.limit ?? 30))
   const offset = (page - 1) * limit
-  const order = params.sortOrder === 'asc' ? asc(salesRest.saleDate) : desc(salesRest.saleDate)
+  const order = params.sortOrder === 'asc' ? asc(salesRecordsNew.saleDate) : desc(salesRecordsNew.saleDate)
+  const stClairStore = await getStoreByKey('st-clair')
+
+  if (!stClairStore) {
+    throw new Error('Store not found for key: st-clair')
+  }
 
   const conditions = [
-    params.startDate ? gte(salesRest.saleDate, params.startDate) : undefined,
-    params.endDate ? lte(salesRest.saleDate, params.endDate) : undefined,
-  ].filter(Boolean) as ReturnType<typeof gte>[]
+    eq(salesRecordsNew.storeId, stClairStore.id),
+    params.startDate ? gte(salesRecordsNew.saleDate, params.startDate) : undefined,
+    params.endDate ? lte(salesRecordsNew.saleDate, params.endDate) : undefined,
+  ].filter((condition): condition is NonNullable<typeof condition> => Boolean(condition))
 
   const [rows, [countRow]] = await Promise.all([
     db
       .select()
-      .from(salesRest)
+      .from(salesRecordsNew)
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(order)
       .limit(limit)
       .offset(offset),
     db
       .select({ count: sql<number>`count(*)::int` })
-      .from(salesRest)
+      .from(salesRecordsNew)
       .where(conditions.length ? and(...conditions) : undefined),
   ])
 
@@ -801,41 +841,55 @@ export async function listSalesRestFromDb(params: {
 }
 
 export async function upsertSalesRestInDb(input: SalesRestInput): Promise<SalesRestRecord> {
+  const stClairStore = await getStoreByKey('st-clair')
+
+  if (!stClairStore) {
+    throw new Error('Store not found for key: st-clair')
+  }
+
+  const ubereatsCommission = input.ubereatsFee ?? 0
+  const doordashCommission = input.doordashFee ?? 0
+  const ubereatsCommissionRate = (input.ubereatsSale ?? 0) > 0 ? Number((ubereatsCommission / (input.ubereatsSale ?? 0)).toFixed(6)) : 0
+  const doordashCommissionRate = (input.doordashSale ?? 0) > 0 ? Number((doordashCommission / (input.doordashSale ?? 0)).toFixed(6)) : 0
+
   const [row] = await db
-    .insert(salesRest)
+    .insert(salesRecordsNew)
     .values({
+      storeId: stClairStore.id,
       saleDate: input.saleDate,
       dayOfWeek: input.dayOfWeek ?? null,
       grossSale: input.grossSale ?? 0,
       cardWithoutTips: input.cardWithoutTips ?? 0,
       paidOut: input.paidOut ?? 0,
       cardWithTips: input.cardWithTips ?? 0,
-      cashSale: input.cashSale ?? 0,
-      ubereatsSale: input.ubereatsSale ?? 0,
-      doordashSale: input.doordashSale ?? 0,
+      cashSaleInclGross: input.cashSale ?? 0,
+      ubereats: input.ubereatsSale ?? 0,
+      doordash: input.doordashSale ?? 0,
       cashAndCarry: input.cashAndCarry ?? 0,
       totalSale: input.totalSale ?? 0,
       cashExpenses: input.cashExpenses ?? 0,
-      cashLeft: input.cashLeft ?? null,
-      actualCash: input.actualCash ?? null,
-      totalCash: input.totalCash ?? null,
-      balance: input.balance ?? null,
-      ubereatsFee: input.ubereatsFee ?? 0,
-      doordashFee: input.doordashFee ?? 0,
+      cashLeft: input.cashLeft ?? 0,
+      actualCash: input.actualCash ?? 0,
+      totalCash: input.totalCash ?? 0,
+      balance: input.balance ?? 0,
+      ubereatsCommissionRate,
+      ubereatsCommission,
+      doordashCommissionRate,
+      doordashCommission,
       totalCommissions: input.totalCommissions ?? 0,
       totalSaleAfterCommission: input.totalSaleAfterCommission ?? 0,
     })
     .onConflictDoUpdate({
-      target: salesRest.saleDate,
+      target: [salesRecordsNew.storeId, salesRecordsNew.saleDate],
       set: {
         dayOfWeek: sql`excluded.day_of_week`,
         grossSale: sql`excluded.gross_sale`,
         cardWithoutTips: sql`excluded.card_without_tips`,
         paidOut: sql`excluded.paid_out`,
         cardWithTips: sql`excluded.card_with_tips`,
-        cashSale: sql`excluded.cash_sale`,
-        ubereatsSale: sql`excluded.ubereats_sale`,
-        doordashSale: sql`excluded.doordash_sale`,
+        cashSaleInclGross: sql`excluded.cash_sale_incl_gross`,
+        ubereats: sql`excluded.ubereats`,
+        doordash: sql`excluded.doordash`,
         cashAndCarry: sql`excluded.cash_and_carry`,
         totalSale: sql`excluded.total_sale`,
         cashExpenses: sql`excluded.cash_expenses`,
@@ -843,8 +897,10 @@ export async function upsertSalesRestInDb(input: SalesRestInput): Promise<SalesR
         actualCash: sql`excluded.actual_cash`,
         totalCash: sql`excluded.total_cash`,
         balance: sql`excluded.balance`,
-        ubereatsFee: sql`excluded.ubereats_fee`,
-        doordashFee: sql`excluded.doordash_fee`,
+        ubereatsCommissionRate: sql`excluded.ubereats_commission_rate`,
+        ubereatsCommission: sql`excluded.ubereats_commission`,
+        doordashCommissionRate: sql`excluded.doordash_commission_rate`,
+        doordashCommission: sql`excluded.doordash_commission`,
         totalCommissions: sql`excluded.total_commissions`,
         totalSaleAfterCommission: sql`excluded.total_sale_after_commission`,
         updatedAt: sql`now()`,

@@ -83,6 +83,7 @@ export function DailySalesForm() {
   const [isEditMode, setIsEditMode] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const text = getTranslation(language)
   const dateLocale = language === 'ko' ? ko : enUS
   const selectedStore = STORES.find((store) => store.id === selectedStoreId)
@@ -212,6 +213,7 @@ export function DailySalesForm() {
     const cachedEntry = findCachedEntry(nextDate, lastSelectedStore)
 
     setLoadError(null)
+    setSubmitError(null)
     setIsEditMode(false)
     if (cachedEntry) {
       setIsEditMode(true)
@@ -293,13 +295,18 @@ export function DailySalesForm() {
       actualClosingCash: typeof data.actualClosingCash === 'number' ? data.actualClosingCash : 0,
     }
 
+    setSubmitError(null)
     setIsSubmitting(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    await recordDailySalesEntry({ ...normalizedData, storeId: resolvedStoreId })
-    setIsSubmitting(false)
-    resetDailySalesFormData()
-    closeDrawer('dailySalesForm')
+
+    try {
+      await recordDailySalesEntry({ ...normalizedData, storeId: resolvedStoreId })
+      resetDailySalesFormData()
+      closeDrawer('dailySalesForm')
+    } catch {
+      setSubmitError(language === 'ko' ? '저장에 실패했습니다. 잠시 후 다시 시도해주세요.' : 'Failed to save the entry. Please try again shortly.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleClose = () => {
@@ -339,6 +346,14 @@ export function DailySalesForm() {
                 <AlertCircle />
                 <AlertTitle>{text.dailySalesForm.loadFailedTitle}</AlertTitle>
                 <AlertDescription>{loadError}</AlertDescription>
+              </Alert>
+            ) : null}
+
+            {submitError ? (
+              <Alert variant="destructive">
+                <AlertCircle />
+                <AlertTitle>{language === 'ko' ? '저장 실패' : 'Save failed'}</AlertTitle>
+                <AlertDescription>{submitError}</AlertDescription>
               </Alert>
             ) : null}
 

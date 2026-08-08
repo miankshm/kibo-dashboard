@@ -8,6 +8,20 @@
       "when": 1782584796549,
       "tag": "0000_add_sales_rest_table",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783990674774,
+      "tag": "0001_shallow_rhodey",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784592000000,
+      "tag": "0002_add_store_id_to_sales_records_new",
+      "breakpoints": true
     }
   ]
 }
