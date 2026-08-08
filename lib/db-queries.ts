@@ -458,11 +458,17 @@ export async function getDashboardTrendsFromDb(params: {
     labels = dailyDates.map((date) => toDisplayLabel(toDateKey(date), language))
     points = dailyDates.map((date) => valueByDate.get(toDateKey(date)) ?? 0)
   } else if (params.period === 'weekly') {
-    labels = language === 'ko' ? ['1주차', '2주차', '3주차', '4주차'] : ['W1', 'W2', 'W3', 'W4']
+    const currentDayOfMonth = now.getDate()
+    const weekCount = Math.ceil(currentDayOfMonth / 7)
+    labels = Array.from({ length: weekCount }, (_, index) => (
+      language === 'ko' ? `${index + 1}주차` : `W${index + 1}`
+    ))
     points = await Promise.all(
-      Array.from({ length: 4 }, async (_, index) => {
-        const endDate = addDays(now, -(3 - index) * 7)
-        const startDate = addDays(endDate, -6)
+      Array.from({ length: weekCount }, async (_, index) => {
+        const startDay = index * 7 + 1
+        const endDay = Math.min((index + 1) * 7, currentDayOfMonth)
+        const startDate = startOfDay(new Date(now.getFullYear(), now.getMonth(), startDay))
+        const endDate = startOfDay(new Date(now.getFullYear(), now.getMonth(), endDay))
         const totals = await getTotals(params.storeKey, toDateKey(startDate), toDateKey(endDate))
         return params.salesMode === 'gross' ? totals.totalSales : totals.netSales
       })

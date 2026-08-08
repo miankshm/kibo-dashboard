@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { UseEmblaCarouselType } from 'embla-carousel-react'
 import {
   BarElement,
   CategoryScale,
@@ -19,7 +18,6 @@ import { Banknote, CreditCard, Package, TrendingDown, TrendingUp, Truck } from '
 import { getDashboardTrends } from '@/lib/api/dashboard'
 import { getSalesList } from '@/lib/api/sales'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -27,8 +25,6 @@ import { useWorkflow } from '@/contexts/workflow-context'
 import { getTranslation } from '@/lib/i18n'
 import type { SaleRecord, SalesMode, TrendDataset } from '@/lib/types'
 import { useStore } from '@/store/useStore'
-
-type CarouselApi = UseEmblaCarouselType[1]
 
 interface SalesCardProps {
   title: string
@@ -67,6 +63,25 @@ function formatDate(dateString: string, language: 'ko' | 'en') {
     day: 'numeric',
     year: 'numeric',
   })
+}
+
+function startOfDay(date: Date) {
+  const next = new Date(date)
+  next.setHours(0, 0, 0, 0)
+  return next
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function toDateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function formatCurrencyAmount(value: number, language: 'ko' | 'en') {
@@ -173,29 +188,12 @@ export function SalesSummary() {
   const { showGrossSales, toggleSalesMode, selectedPeriod, setSelectedPeriod, dataVersion } = useWorkflow()
   const { selectedStoreId, language } = useStore()
   const text = getTranslation(language)
-  const selectedSlideDateRef = useRef<string | null>(null)
-  const [carouselApi, setCarouselApi] = useState<CarouselApi>()
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const trendChartRef = useRef<ChartJS<'bar'> | null>(null)
   const [slides, setSlides] = useState<SalesSlide[]>([])
+  const [selectedKpiDate, setSelectedKpiDate] = useState<string | null>(null)
   const [trendLabels, setTrendLabels] = useState<string[]>([])
   const [trendDatasets, setTrendDatasets] = useState<TrendDataset[]>([])
   const [chartPeriodTotal, setChartPeriodTotal] = useState(0)
-
-  useEffect(() => {
-    if (!carouselApi) return
-
-    const onSelect = () => setCurrentIndex(carouselApi.selectedScrollSnap())
-    carouselApi.on('select', onSelect)
-    onSelect()
-
-    return () => {
-      carouselApi.off('select', onSelect)
-    }
-  }, [carouselApi])
-
-  useEffect(() => {
-    selectedSlideDateRef.current = slides[currentIndex]?.date ?? null
-  }, [currentIndex, slides])
 
   useEffect(() => {
     let isMounted = true
@@ -209,8 +207,8 @@ export function SalesSummary() {
       const [salesResponse, trendResponse] = await Promise.all([
         getSalesList({
           storeKey: selectedStoreId,
-          startDate: startDate.toISOString().split('T')[0],
-          endDate: endDate.toISOString().split('T')[0],
+          startDate: toDateKey(startDate),
+          endDate: toDateKey(endDate),
           limit: selectedStoreId === 'all' ? 16 : 8,
           sortOrder: 'asc',
         }),
@@ -248,22 +246,39 @@ export function SalesSummary() {
   }, [dataVersion, language, selectedPeriod, selectedStoreId, showGrossSales])
 
   useEffect(() => {
-    if (slides.length === 0) {
-      setCurrentIndex(0)
-      selectedSlideDateRef.current = null
-      return
+    if (selectedPeriod !== 'daily') {
+      setSelectedKpiDate(null)
     }
+  }, [selectedPeriod])
 
-    const matchedIndex = selectedSlideDateRef.current
-      ? slides.findIndex((slide) => slide.date === selectedSlideDateRef.current)
-      : -1
-    const nextIndex = matchedIndex >= 0 ? matchedIndex : slides.length - 1
+  const slideByDate = useMemo(() => new Map(slides.map((slide) => [slide.date, slide])), [slides])
 
-    setCurrentIndex(nextIndex)
-    carouselApi?.scrollTo(nextIndex, true)
-  }, [slides, carouselApi])
+  const dailyDateKeys = useMemo(() => {
+    const now = startOfDay(new Date())
+    const daysFromMonday = (now.getDay() + 6) % 7
+    const weekStart = addDays(now, -daysFromMonday)
 
-  const currentSlide = slides[currentIndex] ?? slides[slides.length - 1]
+    return Array.from({ length: daysFromMonday + 1 }, (_, index) => toDateKey(addDays(weekStart, index)))
+  }, [dataVersion])
+
+  const fallbackDailySlide = useMemo(() => {
+    if (selectedPeriod !== 'daily' || !selectedKpiDate) return null
+
+    return {
+      date: selectedKpiDate,
+      total: 0,
+      cards: [
+        { key: 'cardSales' as const, value: 0, change: 0 },
+        { key: 'cashSales' as const, value: 0, change: 0 },
+        { key: 'deliverySales' as const, value: 0, change: 0 },
+        { key: 'cashAndCarrySales' as const, value: 0, change: 0 },
+      ],
+    }
+  }, [selectedKpiDate, selectedPeriod])
+
+  const currentSlide = selectedPeriod === 'daily' && selectedKpiDate
+    ? slideByDate.get(selectedKpiDate) ?? fallbackDailySlide ?? slides[slides.length - 1]
+    : slides[slides.length - 1]
   const displayTotal = currentSlide?.total ?? 0
   const cumulativeSalesLabel =
     selectedPeriod === 'daily'
@@ -309,6 +324,10 @@ export function SalesSummary() {
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: 'index' as const,
+      intersect: false,
+    },
     plugins: {
       legend: {
         display: false,
@@ -319,6 +338,7 @@ export function SalesSummary() {
         bodyColor: '#fff',
         padding: 12,
         displayColors: true,
+        filter: (tooltipItem: { datasetIndex: number }) => tooltipItem.datasetIndex === 0,
         callbacks: {
           label: (context: { parsed: { y: number } }) => `$${formatCurrencyAmount(context.parsed.y, language)}`,
         },
@@ -337,6 +357,26 @@ export function SalesSummary() {
         },
       },
     },
+  }
+
+  const handleTrendChartClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (selectedPeriod !== 'daily') return
+
+    const chart = trendChartRef.current
+    if (!chart || !chart.canvas || !chart.scales?.x) return
+
+    const rect = chart.canvas.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const rawIndex = chart.scales.x.getValueForPixel(x)
+    const normalizedIndex = typeof rawIndex === 'number' ? Math.round(rawIndex) : Number(rawIndex)
+    if (!Number.isFinite(normalizedIndex)) return
+
+    const clickedIndex = Math.max(0, Math.min(dailyDateKeys.length - 1, normalizedIndex))
+
+    const clickedDate = dailyDateKeys[clickedIndex]
+    if (!clickedDate) return
+
+    setSelectedKpiDate(clickedDate)
   }
 
   return (
@@ -368,43 +408,31 @@ export function SalesSummary() {
         </div>
       </div>
 
-      <div className="relative px-10">
-        <Carousel setApi={setCarouselApi}>
-          <CarouselContent>
-            {slides.map((slide) => (
-              <CarouselItem key={slide.date}>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <SalesCard
-                    title={text.salesSummary.cardSales}
-                    value={`$${formatCurrencyAmount(slide.cards[0]?.value ?? 0, language)}`}
-                    change={slide.cards[0]?.change ?? 0}
-                    icon={CreditCard}
-                  />
-                  <SalesCard
-                    title={text.salesSummary.cashSales}
-                    value={`$${formatCurrencyAmount(slide.cards[1]?.value ?? 0, language)}`}
-                    change={slide.cards[1]?.change ?? 0}
-                    icon={Banknote}
-                  />
-                  <SalesCard
-                    title={text.salesSummary.deliverySales}
-                    value={`$${formatCurrencyAmount(slide.cards[2]?.value ?? 0, language)}`}
-                    change={slide.cards[2]?.change ?? 0}
-                    icon={Truck}
-                  />
-                  <SalesCard
-                    title={text.salesSummary.cashAndCarrySales}
-                    value={`$${formatCurrencyAmount(slide.cards[3]?.value ?? 0, language)}`}
-                    change={slide.cards[3]?.change ?? 0}
-                    icon={Package}
-                  />
-                </div>
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-          <CarouselPrevious className="-left-10" />
-          <CarouselNext className="-right-10" />
-        </Carousel>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SalesCard
+          title={text.salesSummary.cardSales}
+          value={`$${formatCurrencyAmount(currentSlide?.cards[0]?.value ?? 0, language)}`}
+          change={currentSlide?.cards[0]?.change ?? 0}
+          icon={CreditCard}
+        />
+        <SalesCard
+          title={text.salesSummary.cashSales}
+          value={`$${formatCurrencyAmount(currentSlide?.cards[1]?.value ?? 0, language)}`}
+          change={currentSlide?.cards[1]?.change ?? 0}
+          icon={Banknote}
+        />
+        <SalesCard
+          title={text.salesSummary.deliverySales}
+          value={`$${formatCurrencyAmount(currentSlide?.cards[2]?.value ?? 0, language)}`}
+          change={currentSlide?.cards[2]?.change ?? 0}
+          icon={Truck}
+        />
+        <SalesCard
+          title={text.salesSummary.cashAndCarrySales}
+          value={`$${formatCurrencyAmount(currentSlide?.cards[3]?.value ?? 0, language)}`}
+          change={currentSlide?.cards[3]?.change ?? 0}
+          icon={Package}
+        />
       </div>
 
       <Card>
@@ -428,8 +456,8 @@ export function SalesSummary() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px]">
-            <Chart type="bar" data={chartData} options={chartOptions as object} />
+          <div className="h-[300px]" onClick={handleTrendChartClick}>
+            <Chart ref={trendChartRef} type="bar" data={chartData} options={chartOptions as object} />
           </div>
         </CardContent>
       </Card>
