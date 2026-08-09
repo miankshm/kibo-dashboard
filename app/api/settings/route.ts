@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { admins, joinRequests } from '@/lib/schema'
 import { sendEmail } from '@/lib/email'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, inArray, notInArray } from 'drizzle-orm'
 import { AUTH_IDENTITY_COOKIE_NAME } from '@/lib/auth'
 
 async function resolveCurrentAdmin(request: NextRequest) {
@@ -27,16 +27,25 @@ export async function GET(request: NextRequest) {
 
   try {
     const currentAdmin = await resolveCurrentAdmin(request)
-    const requestRows = await db.select().from(joinRequests).orderBy(desc(joinRequests.requestedAt))
+    const [requestRows, adminRows] = await Promise.all([
+      db.select().from(joinRequests).orderBy(desc(joinRequests.requestedAt)),
+      db.select({ id: admins.id, name: admins.name, email: admins.email, receiveReportEmails: admins.receiveReportEmails }).from(admins),
+    ])
 
     return NextResponse.json({
       success: true,
-      notifyUpdates: currentAdmin?.receiveUpdateEmails ?? true,
+      notifyUpdates: currentAdmin?.receiveReportEmails ?? true,
       requests: requestRows.map((request) => ({
         id: request.id,
         email: request.email,
         status: request.status,
         requestedAt: request.requestedAt?.toISOString() ?? null,
+      })),
+      adminList: adminRows.map((a) => ({
+        id: a.id,
+        name: a.name,
+        email: a.email,
+        receiveReportEmails: a.receiveReportEmails ?? true,
       })),
     })
   } catch {
@@ -64,8 +73,28 @@ export async function PATCH(request: NextRequest) {
       }
 
       await db.update(admins)
-        .set({ receiveUpdateEmails: body.notifyUpdates })
+        .set({ receiveReportEmails: body.notifyUpdates })
         .where(eq(admins.id, currentAdmin.id))
+    }
+
+    if (Array.isArray(body.reportRecipients)) {
+      const recipientEmails = (body.reportRecipients as unknown[]).filter((e): e is string => typeof e === 'string')
+
+      const allAdmins = await db.select({ id: admins.id, email: admins.email }).from(admins)
+
+      if (allAdmins.length > 0) {
+        const recipientIds = allAdmins.filter((a) => recipientEmails.includes(a.email)).map((a) => a.id)
+        const nonRecipientIds = allAdmins.filter((a) => !recipientEmails.includes(a.email)).map((a) => a.id)
+
+        if (recipientIds.length > 0) {
+          await db.update(admins).set({ receiveReportEmails: true }).where(inArray(admins.id, recipientIds))
+        }
+        if (nonRecipientIds.length > 0) {
+          await db.update(admins).set({ receiveReportEmails: false }).where(inArray(admins.id, nonRecipientIds))
+        }
+      }
+
+      return NextResponse.json({ success: true })
     }
 
     if (typeof body.requestId === 'string' && body.action === 'approve') {

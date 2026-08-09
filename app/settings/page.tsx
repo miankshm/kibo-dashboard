@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { BellRing, CheckCircle2, Clock3, Mail, Sparkles } from 'lucide-react'
+import { CheckCircle2, Clock3, Mail, Send, Sparkles, Users } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { PageContainer } from '@/components/layout/PageContainer'
@@ -22,11 +22,19 @@ type JoinRequest = {
   status: RequestStatus | 'activated'
 }
 
+type AdminUser = {
+  id: string
+  name: string
+  email: string
+  receiveReportEmails: boolean
+}
+
 export default function SettingsPage() {
   const language = useStore((state) => state.language)
   const text = getTranslation(language)
   const [notifyUpdates, setNotifyUpdates] = useState(true)
   const [requests, setRequests] = useState<JoinRequest[]>([])
+  const [adminList, setAdminList] = useState<AdminUser[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState('')
@@ -36,11 +44,12 @@ export default function SettingsPage() {
     const loadSettings = async () => {
       try {
         const response = await fetch('/api/settings')
-        const payload = await response.json() as { success?: boolean, notifyUpdates?: boolean, requests?: JoinRequest[] }
+        const payload = await response.json() as { success?: boolean, notifyUpdates?: boolean, requests?: JoinRequest[], adminList?: AdminUser[] }
 
         if (payload.success) {
           setNotifyUpdates(payload.notifyUpdates ?? true)
           setRequests(payload.requests ?? [])
+          setAdminList(payload.adminList ?? [])
         }
       } catch {
         // noop
@@ -134,30 +143,67 @@ export default function SettingsPage() {
 
             <Card className="overflow-hidden border-primary/10 shadow-sm">
               <CardHeader className="border-b bg-muted/20 px-6 py-5">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <BellRing className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <CardTitle>{text.settings.updateNotificationsTitle}</CardTitle>
-                      <CardDescription className="mt-1">{text.settings.updateNotificationsDescription}</CardDescription>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Send className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle>{text.settings.reportEmailTitle}</CardTitle>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4 p-6">
-                <div className="flex flex-col gap-4 rounded-2xl border bg-background/70 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-semibold">{text.settings.updateNotificationsLabel}</p>
+              <CardContent className="space-y-6 p-6">
+                {/* 주 토글 */}
+                <div className="flex items-center justify-between gap-4 rounded-2xl border bg-background/70 p-5 shadow-sm">
+                  <div className="space-y-1">
+                    <p className="text-base font-semibold">{text.settings.reportEmailQuestion}</p>
                     <p className="text-sm text-muted-foreground">
-                      {notifyUpdates ? text.settings.updateNotificationsOn : text.settings.updateNotificationsOff}
+                      {notifyUpdates ? text.settings.reportEmailOn : text.settings.reportEmailOff}
                     </p>
                   </div>
-                  <Switch checked={notifyUpdates} onCheckedChange={handleToggleNotify} disabled={isSaving} />
+                  <Switch checked={notifyUpdates} onCheckedChange={handleToggleNotify} disabled={isSaving} className="shrink-0" />
                 </div>
-                <div className="rounded-2xl border border-dashed border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground">
-                  {text.settings.updateNotificationsHint}
+
+                {/* 수신자 현황 - 읽기 전용 */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Users className="h-4 w-4" />
+                    <span>{text.settings.reportRecipientsHeading}</span>
+                    {adminList.length > 0 && (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
+                        {(() => {
+                          const count = adminList.filter((a) => a.receiveReportEmails).length
+                          return count > 0
+                            ? text.settings.reportRecipientsCount.replace('{count}', String(count))
+                            : text.settings.reportRecipientsCountZero
+                        })()}
+                      </span>
+                    )}
+                  </div>
+
+                  {adminList.length === 0 ? (
+                    <div className="rounded-xl border border-dashed bg-muted/20 p-6 text-center text-sm text-muted-foreground">
+                      {text.settings.reportRecipientsEmpty}
+                    </div>
+                  ) : (
+                    <div className="divide-y rounded-2xl border bg-background/70 shadow-sm">
+                      {adminList.map((user) => (
+                        <div key={user.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{user.name || user.email}</p>
+                            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            user.receiveReportEmails
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {user.receiveReportEmails ? text.settings.reportRecipientsReceiving : text.settings.reportRecipientsNotReceiving}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

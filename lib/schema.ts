@@ -21,7 +21,7 @@ export const admins = pgTable('admins', {
   name: varchar('name', { length: 100 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   passwordHash: text('password_hash').notNull(),
-  receiveUpdateEmails: boolean('receive_update_emails').default(true),
+  receiveReportEmails: boolean('receive_report_emails').default(true),
   isActive: boolean('is_active').default(true),
   invitedBy: uuid('invited_by').references((): AnyPgColumn => admins.id),
   lastLoginAt: timestamp('last_login_at', { mode: 'date' }),

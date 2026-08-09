@@ -75,7 +75,7 @@ export async function POST(request: Request) {
         email: target.email,
         passwordHash,
         isActive: true,
-        receiveUpdateEmails: true,
+        receiveReportEmails: true,
       })
     }
 
