@@ -25,6 +25,7 @@ export const translations = {
       dataLoad: '데이터 로드',
       dailySalesInput: '일일 매출 입력',
       salesSearch: '매출검색',
+      report: '리포트',
       settings: '설정',
     },
     settings: {
@@ -184,6 +185,7 @@ export const translations = {
       dataLoad: 'Data Load',
       dailySalesInput: 'Daily Sales Entry',
       salesSearch: 'Sales Search',
+      report: 'Report',
       settings: 'Settings',
     },
     settings: {
