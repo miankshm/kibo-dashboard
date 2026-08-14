@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,14 @@ import { useStore } from '@/store/useStore'
 import { getTranslation } from '@/lib/i18n'
 
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardPageContent />
+    </Suspense>
+  )
+}
+
+function DashboardPageContent() {
   const { openDrawer } = useWorkflow()
   const language = useStore((state) => state.language)
   const router = useRouter()

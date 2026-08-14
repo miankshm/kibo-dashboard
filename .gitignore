@@ -18,3 +18,5 @@ node_modules
 # Logs and TypeScript build cache
 build.log
 *.tsbuildinfo
+.vercel
+.env*

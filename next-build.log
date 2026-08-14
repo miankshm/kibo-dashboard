@@ -1,0 +1,10 @@
+﻿npx.cmd : 殊?useSearchParams() should be wrapped in a suspense boundary at page 
+"/". Read more: 
+https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+At line:1 char:128
++ ... D 'next-build.log'; try { & npx.cmd pnpm exec next build 2>&1 | Tee-O ...
++                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (殊?useSearchPara...ith-csr-bailout 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
