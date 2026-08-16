@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
         id: request.id,
         email: request.email,
         status: request.status,
+        emailSent: request.inviteSentAt !== null,
         requestedAt: request.requestedAt?.toISOString() ?? null,
       })),
       adminList: adminRows.map((a) => ({
@@ -116,19 +117,26 @@ export async function PATCH(request: NextRequest) {
       }
 
       if (target.status === 'approved') {
+        if (target.inviteSentAt === null) {
+          // Allow retrying delivery when approval succeeded but SMTP failed.
+        } else {
+          return NextResponse.json({
+            success: true,
+            status: 'approved',
+            emailSent: true,
+            message: '이미 승인된 요청입니다.',
+          })
+        }
+      }
+
+      if (target.status !== 'pending' && target.status !== 'approved') {
         return NextResponse.json({
-          success: true,
-          status: 'approved',
-          emailSent: target.inviteSentAt !== null,
-          message: '이미 승인된 요청입니다.',
-        })
+          success: false,
+          message: '처리할 수 없는 요청 상태입니다.',
+        }, { status: 400 })
       }
 
-      if (target.status !== 'pending') {
-        return NextResponse.json({ success: false, message: '처리할 수 없는 요청 상태입니다.' }, { status: 400 })
-      }
-
-      const inviteToken = crypto.randomUUID().replace(/-/g, '')
+      const inviteToken = target.inviteToken ?? crypto.randomUUID().replace(/-/g, '')
       const origin = new URL(request.url).origin
       const setupPath = `/activate?token=${encodeURIComponent(inviteToken)}`
       const setupUrl = `${process.env.APP_BASE_URL ?? origin}${setupPath}`
