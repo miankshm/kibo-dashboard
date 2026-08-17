@@ -39,6 +39,17 @@ export const adminInvitations = pgTable('admin_invitations', {
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
 })
 
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  adminId: uuid('user_id').notNull().references(() => admins.id),
+  tokenHash: text('token').notNull().unique(),
+  expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
+  usedAt: timestamp('used_at', { mode: 'date' }),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
+}, (table) => ({
+  adminIndex: index('idx_password_reset_tokens_admin').on(table.adminId),
+}))
+
 export const joinRequests = pgTable('join_requests', {
   id: uuid('id').defaultRandom().primaryKey(),
   email: varchar('email', { length: 255 }).notNull(),

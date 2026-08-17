@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { getPasswordPolicyError } from '@/lib/password-policy'
 
 type ActivateAccountFormProps = {
   token: string
@@ -30,8 +31,8 @@ export function ActivateAccountForm({ token }: ActivateAccountFormProps) {
       return
     }
 
-    if (password.length < 8) {
-      setErrorMessage('비밀번호는 8자 이상이어야 합니다.')
+    if (getPasswordPolicyError(password)) {
+      setErrorMessage('비밀번호는 12자 이상이며 대문자, 소문자, 숫자, 특수문자를 각각 하나 이상 포함해야 합니다.')
       return
     }
 
@@ -71,7 +72,7 @@ export function ActivateAccountForm({ token }: ActivateAccountFormProps) {
   if (tokenMissing) {
     return (
       <div className="space-y-4">
-        <p className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p className="text-sm text-destructive">
           유효한 활성화 링크가 아닙니다. 관리자에게 다시 승인 요청을 받아주세요.
         </p>
         <Button asChild variant="outline" className="w-full">
@@ -109,9 +110,10 @@ export function ActivateAccountForm({ token }: ActivateAccountFormProps) {
           id="activate-password"
           type="password"
           autoComplete="new-password"
+          minLength={12}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          placeholder="8자 이상 입력하세요"
+          placeholder="12자 이상, 대문자·소문자·숫자·특수문자 포함"
           required
         />
       </div>
@@ -122,6 +124,7 @@ export function ActivateAccountForm({ token }: ActivateAccountFormProps) {
           id="activate-password-confirm"
           type="password"
           autoComplete="new-password"
+          minLength={12}
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
           placeholder="비밀번호를 다시 입력하세요"
@@ -130,7 +133,7 @@ export function ActivateAccountForm({ token }: ActivateAccountFormProps) {
       </div>
 
       {errorMessage ? (
-        <p className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p className="text-sm text-destructive">
           {errorMessage}
         </p>
       ) : null}

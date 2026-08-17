@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { admins, joinRequests } from '@/lib/schema'
 import { hashPassword } from '@/lib/password'
+import { getPasswordPolicyError } from '@/lib/password-policy'
 
 const INVITE_VALID_HOURS = 72
 
@@ -26,8 +27,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: '유효하지 않은 초대 링크입니다.' }, { status: 400 })
     }
 
-    if (password.length < 8) {
-      return NextResponse.json({ success: false, message: '비밀번호는 8자 이상이어야 합니다.' }, { status: 400 })
+    if (getPasswordPolicyError(password)) {
+      return NextResponse.json({
+        success: false,
+        code: 'passwordPolicy',
+        message: '비밀번호는 12자 이상이며 대문자, 소문자, 숫자, 특수문자를 각각 하나 이상 포함해야 합니다.',
+      }, { status: 400 })
     }
 
     const rows = await db

@@ -143,9 +143,21 @@ export async function PATCH(request: NextRequest) {
 
       const emailResult = await sendEmail({
         to: target.email,
-        subject: '[Kibo Dashboard] 가입 요청이 승인되었습니다',
+        subject: '[Kibo Dashboard] Your access request has been approved / 가입 요청이 승인되었습니다',
         html: `
           <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+            <h2 style="margin-bottom: 8px;">Your Kibo Dashboard access request has been approved</h2>
+            <p>Hello,</p>
+            <p>Your request to join Kibo Dashboard has been approved.</p>
+            <p>Use the link below to create your password and activate your account.</p>
+            <p style="margin: 20px 0;">
+              <a href="${setupUrl}" style="display: inline-block; padding: 10px 14px; border-radius: 8px; text-decoration: none; background: #2563eb; color: #ffffff;">Create your password</a>
+            </p>
+            <p>If the link does not open, copy and paste the address below into your browser.</p>
+            <p style="word-break: break-all;">${setupUrl}</p>
+
+            <hr style="margin: 28px 0; border: 0; border-top: 1px solid #e5e7eb;" />
+
             <h2 style="margin-bottom: 8px;">가입 요청 승인 안내</h2>
             <p>안녕하세요.</p>
             <p>요청하신 Kibo Dashboard 가입이 승인되었습니다.</p>
@@ -157,7 +169,7 @@ export async function PATCH(request: NextRequest) {
             <p style="word-break: break-all;">${setupUrl}</p>
           </div>
         `,
-        text: `가입 요청이 승인되었습니다. 아래 링크에서 비밀번호를 설정해주세요: ${setupUrl}`,
+        text: `Your Kibo Dashboard access request has been approved.\n\nUse the link below to create your password and activate your account.\nCreate your password: ${setupUrl}\n\n가입 요청이 승인되었습니다.\n\n아래 링크에서 비밀번호를 설정해 계정을 활성화해주세요.\n비밀번호 설정하기: ${setupUrl}`,
       })
 
       if (!emailResult.ok) {
