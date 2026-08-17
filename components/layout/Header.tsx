@@ -41,7 +41,7 @@ export function Header() {
 
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#99B759] text-primary-foreground">
             <span className="text-sm font-bold">K</span>
           </div>
           <span className="hidden font-semibold sm:inline-block">Kibo Dashboard</span>
@@ -59,7 +59,7 @@ export function Header() {
             variant="ghost"
             size="icon"
             onClick={() => openDrawer('aiWidget')}
-            className="text-primary hover:bg-primary/10"
+            className="text-[#99B759] hover:bg-[#99B759]/10"
           >
             <Bot className="h-5 w-5" />
             <span className="sr-only">{text.header.ai}</span>

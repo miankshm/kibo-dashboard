@@ -109,7 +109,7 @@ export function Sidebar() {
         <div className="flex h-full flex-col border-r border-sidebar-border bg-sidebar">
           {/* Logo area */}
           <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#99B759] text-primary-foreground">
               <span className="text-sm font-bold">K</span>
             </div>
             <span className="font-semibold text-sidebar-foreground">Kibo Dashboard</span>
@@ -123,7 +123,7 @@ export function Sidebar() {
         <SheetContent side="left" className="w-64 p-0 bg-sidebar">
           <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#99B759] text-primary-foreground">
                 <span className="text-sm font-bold">K</span>
               </div>
               <span className="font-semibold text-sidebar-foreground">Kibo Dashboard</span>

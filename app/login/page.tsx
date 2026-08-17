@@ -116,7 +116,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
       </div>
 
       {/* Left: Kibo AI chatbot intro for general customers */}
-      <div className="relative flex min-h-[50vh] w-full flex-col items-start justify-start overflow-hidden bg-primary px-8 pt-20 text-left text-primary-foreground sm:px-12 sm:pt-24 lg:min-h-screen lg:w-1/2 lg:flex-none lg:pt-52">
+      <div className="relative flex min-h-[50vh] w-full flex-col items-start justify-start overflow-hidden bg-[#99B759] px-8 pt-20 text-left text-primary-foreground sm:px-12 sm:pt-24 lg:min-h-screen lg:w-1/2 lg:flex-none lg:pt-52">
         <div className="relative z-10 max-w-md space-y-4">
           <h2 className="text-2xl font-bold leading-tight sm:text-3xl">{copy.heroTitle}</h2>
           <p className="text-sm text-primary-foreground/80">{copy.heroDescription}</p>

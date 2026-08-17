@@ -160,7 +160,7 @@ export function HolidayComparison() {
       {
         label: `${selectedHoliday?.name ?? text.holiday.title} 매출`,
         data: comparison?.chart.data ?? [],
-        backgroundColor: 'oklch(0.527 0.154 150.069)',
+        backgroundColor: '#99B759',
         borderRadius: 4,
       },
     ],
