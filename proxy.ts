@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AUTH_COOKIE_NAME, isAuthenticatedCookie } from '@/lib/auth'
+// isAuthenticatedCookie verifies the HMAC signature and expiry of the session token
 
 const PUBLIC_PATHS = new Set(['/login', '/chat', '/reset-password'])
 

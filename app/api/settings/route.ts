@@ -3,10 +3,11 @@ import { db } from '@/lib/db'
 import { admins, joinRequests } from '@/lib/schema'
 import { sendEmail } from '@/lib/email'
 import { eq, desc, inArray, notInArray } from 'drizzle-orm'
-import { AUTH_IDENTITY_COOKIE_NAME } from '@/lib/auth'
+import { AUTH_COOKIE_NAME, verifySessionToken } from '@/lib/auth'
 
 async function resolveCurrentAdmin(request: NextRequest) {
-  const identity = request.cookies.get(AUTH_IDENTITY_COOKIE_NAME)?.value?.trim().toLowerCase()
+  const session = verifySessionToken(request.cookies.get(AUTH_COOKIE_NAME)?.value)
+  const identity = session?.identity?.trim().toLowerCase()
 
   if (identity) {
     const matched = await db!.select().from(admins).where(eq(admins.email, identity)).limit(1)

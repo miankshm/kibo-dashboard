@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { AUTH_COOKIE_NAME, AUTH_IDENTITY_COOKIE_NAME, getAuthCookieValue, isValidInternalLogin } from '@/lib/auth'
+import { AUTH_COOKIE_NAME, SESSION_MAX_AGE_SECONDS, createSessionToken } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { admins } from '@/lib/schema'
 import { verifyPassword } from '@/lib/password'
@@ -46,10 +46,6 @@ export async function POST(request: Request) {
   }
 
   if (!isAuthenticated) {
-    isAuthenticated = isValidInternalLogin(username, password)
-  }
-
-  if (!isAuthenticated) {
     return NextResponse.json(
       {
         success: false,
@@ -61,18 +57,12 @@ export async function POST(request: Request) {
 
   const response = NextResponse.json({ success: true })
 
-  response.cookies.set(AUTH_COOKIE_NAME, getAuthCookieValue(), {
+  response.cookies.set(AUTH_COOKIE_NAME, createSessionToken(loginIdentity), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-  })
-
-  response.cookies.set(AUTH_IDENTITY_COOKIE_NAME, loginIdentity, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
+    maxAge: SESSION_MAX_AGE_SECONDS,
   })
 
   return response
