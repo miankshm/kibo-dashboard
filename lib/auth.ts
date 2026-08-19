@@ -29,11 +29,14 @@ export function verifySessionToken(token: string | undefined): { identity: strin
   }
 
   const parts = decoded.split('.')
-  if (parts.length !== 3) {
+  if (parts.length < 3) {
     return null
   }
 
-  const [identity, expiresAtRaw, signature] = parts
+  // Email identities contain dots, so only the last two segments are fixed-format (expiresAt, signature).
+  const signature = parts[parts.length - 1]
+  const expiresAtRaw = parts[parts.length - 2]
+  const identity = parts.slice(0, parts.length - 2).join('.')
   const expiresAt = Number(expiresAtRaw)
 
   if (!identity || !Number.isFinite(expiresAt)) {
