@@ -3,7 +3,18 @@ import { AUTH_COOKIE_NAME, SESSION_MAX_AGE_SECONDS, createSessionToken } from '@
 import { db } from '@/lib/db'
 import { admins } from '@/lib/schema'
 import { verifyPassword } from '@/lib/password'
+import { checkLoginRateLimit } from '@/lib/rate-limit'
 import { and, eq } from 'drizzle-orm'
+
+function getClientIp(request: Request): string {
+  const forwardedFor = request.headers.get('x-forwarded-for')
+
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0].trim() || 'unknown'
+  }
+
+  return request.headers.get('x-real-ip')?.trim() || 'unknown'
+}
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
@@ -21,6 +32,22 @@ export async function POST(request: Request) {
   const username = body.username.trim()
   const password = body.password
   const normalizedUsername = username.toLowerCase()
+  const rateLimit = await checkLoginRateLimit(getClientIp(request))
+
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
+      },
+      {
+        status: 429,
+        headers: rateLimit.retryAfterSeconds
+          ? { 'Retry-After': String(rateLimit.retryAfterSeconds) }
+          : undefined,
+      },
+    )
+  }
 
   let isAuthenticated = false
   let loginIdentity = normalizedUsername

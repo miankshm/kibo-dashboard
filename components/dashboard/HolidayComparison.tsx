@@ -57,6 +57,15 @@ const usdCurrencyFormatter = new Intl.NumberFormat('en-US', {
 
 const formatCurrency = (value: number) => usdCurrencyFormatter.format(value)
 
+const formatHolidayDate = (dateString: string, language: 'ko' | 'en') => {
+  const date = new Date(`${dateString}T00:00:00`)
+  const weekday = new Intl.DateTimeFormat(language === 'ko' ? 'ko-KR' : 'en-US', {
+    weekday: 'short',
+  }).format(date)
+
+  return `${dateString} (${weekday})`
+}
+
 const valueLabelPlugin = {
   id: 'valueLabelPlugin',
   afterDatasetsDraw: (chart: ChartJS<'bar'>) => {
@@ -316,7 +325,7 @@ export function HolidayComparison() {
                     historyRows.map((row) => (
                       <TableRow key={`${row.year}-${row.date}`}>
                         <TableCell>{row.year}</TableCell>
-                        <TableCell>{row.date}</TableCell>
+                        <TableCell>{formatHolidayDate(row.date, language)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(row.sales)}</TableCell>
                         <TableCell className="text-right">
                           {row.yoy === null ? (

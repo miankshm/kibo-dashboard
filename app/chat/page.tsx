@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useRef, useState } from 'react'
+import { FormEvent, ReactNode, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Clock3, Loader2, MapPin, MessageCircle, Send, Sparkles, Utensils } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -85,6 +85,110 @@ function getResponseText(payload: unknown): string | null {
   }
 
   return null
+}
+
+function renderInlineMarkdown(text: string): ReactNode[] {
+  const tokens = text.split(/(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\[[^\]]+\]\([^\s)]+\)|\*[^*]+\*|_[^_]+_)/g)
+
+  return tokens.map((token, index) => {
+    if (token.startsWith('**') && token.endsWith('**')) {
+      return <strong key={index}>{token.slice(2, -2)}</strong>
+    }
+
+    if (token.startsWith('__') && token.endsWith('__')) {
+      return <strong key={index}>{token.slice(2, -2)}</strong>
+    }
+
+    if (token.startsWith('`') && token.endsWith('`')) {
+      return <code key={index} className="rounded bg-background/70 px-1 py-0.5 text-[0.9em]">{token.slice(1, -1)}</code>
+    }
+
+    const linkMatch = token.match(/^\[([^\]]+)\]\(([^\s)]+)\)$/)
+    const linkTarget = linkMatch && /^(https?:\/\/|mailto:)/i.test(linkMatch[2])
+      ? linkMatch[2]
+      : null
+    if (linkMatch && linkTarget) {
+      return (
+        <a
+          key={index}
+          href={linkTarget}
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium underline underline-offset-2"
+        >
+          {linkMatch[1]}
+        </a>
+      )
+    }
+
+    if ((token.startsWith('*') && token.endsWith('*')) || (token.startsWith('_') && token.endsWith('_'))) {
+      return <em key={index}>{token.slice(1, -1)}</em>
+    }
+
+    return token
+  })
+}
+
+function MarkdownMessage({ content }: { content: string }) {
+  const lines = content.replace(/\r\n?/g, '\n').split('\n')
+  const elements: ReactNode[] = []
+  let listItems: { ordered: boolean; text: string }[] = []
+
+  const flushList = () => {
+    if (!listItems.length) {
+      return
+    }
+
+    const ordered = listItems[0].ordered
+    const List = ordered ? 'ol' : 'ul'
+    elements.push(
+      <List key={`list-${elements.length}`} className={`${ordered ? 'list-decimal' : 'list-disc'} space-y-1 pl-5`}>
+        {listItems.map((item, index) => (
+          <li key={index}>{renderInlineMarkdown(item.text)}</li>
+        ))}
+      </List>,
+    )
+    listItems = []
+  }
+
+  lines.forEach((line, index) => {
+    const listMatch = line.match(/^\s*([-*+]|\d+[.)])\s+(.+)$/)
+    if (listMatch) {
+      const ordered = /^\d/.test(listMatch[1])
+      if (listItems.length && listItems[0].ordered !== ordered) {
+        flushList()
+      }
+      listItems.push({ ordered, text: listMatch[2] })
+      return
+    }
+
+    flushList()
+    const trimmedLine = line.trim()
+    if (!trimmedLine) {
+      return
+    }
+
+    const headingMatch = trimmedLine.match(/^(#{1,3})\s+(.+)$/)
+    if (headingMatch) {
+      const Heading = `h${headingMatch[1].length}` as 'h1' | 'h2' | 'h3'
+      elements.push(
+        <Heading key={index} className="font-semibold first:mt-0 [&:not(:first-child)]:mt-3">
+          {renderInlineMarkdown(headingMatch[2])}
+        </Heading>,
+      )
+      return
+    }
+
+    elements.push(
+      <p key={index} className="leading-6">
+        {renderInlineMarkdown(trimmedLine)}
+      </p>,
+    )
+  })
+
+  flushList()
+
+  return <div className="space-y-2">{elements}</div>
 }
 
 export default function ChatPage() {
@@ -274,15 +378,19 @@ export default function ChatPage() {
                   key={chatMessage.id}
                   className={`flex ${chatMessage.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <p
+                  <div
                     className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 ${
                       chatMessage.role === 'user'
                         ? 'rounded-br-sm bg-[#99B759] text-primary-foreground'
                         : 'rounded-bl-sm bg-secondary text-secondary-foreground'
                     }`}
                   >
-                    {chatMessage.content}
-                  </p>
+                    {chatMessage.role === 'assistant' ? (
+                      <MarkdownMessage content={chatMessage.content} />
+                    ) : (
+                      chatMessage.content
+                    )}
+                  </div>
                 </div>
               ))}
               {isSubmitting ? (

@@ -24,6 +24,17 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Login rate limiting
+
+Login requests use Upstash Redis to limit each client IP to 30 requests per 15 minutes. Set these environment variables in the deployment environment:
+
+```env
+UPSTASH_REDIS_REST_URL=https://...
+UPSTASH_REDIS_REST_TOKEN=...
+```
+
+If these variables are missing, the application logs a warning and allows login requests to continue without rate limiting. Configure them before production deployment. When the limit is exceeded, the login API returns `429` with a `Retry-After` header.
+
 ## Learn More
 
 To learn more, take a look at the following resources:
