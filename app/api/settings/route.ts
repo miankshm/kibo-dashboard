@@ -3,10 +3,12 @@ import { db } from '@/lib/db'
 import { admins, joinRequests } from '@/lib/schema'
 import { sendEmail } from '@/lib/email'
 import { eq, desc, inArray, notInArray } from 'drizzle-orm'
-import { AUTH_IDENTITY_COOKIE_NAME } from '@/lib/auth'
+import { auth } from '@/lib/auth/server'
 
 async function resolveCurrentAdmin(request: NextRequest) {
-  const identity = request.cookies.get(AUTH_IDENTITY_COOKIE_NAME)?.value?.trim().toLowerCase()
+  void request
+  const { data: session } = await auth.getSession()
+  const identity = session?.user?.email?.trim().toLowerCase()
 
   if (identity) {
     const matched = await db!.select().from(admins).where(eq(admins.email, identity)).limit(1)
@@ -16,8 +18,7 @@ async function resolveCurrentAdmin(request: NextRequest) {
     }
   }
 
-  const fallback = await db!.select().from(admins).limit(1)
-  return fallback[0] ?? null
+  return null
 }
 
 export async function GET(request: NextRequest) {
@@ -27,6 +28,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const currentAdmin = await resolveCurrentAdmin(request)
+
+    if (!currentAdmin || currentAdmin.isActive !== true) {
+      return NextResponse.json({ success: false, message: '관리자 인증이 필요합니다.' }, { status: 401 })
+    }
+
     const [requestRows, adminRows] = await Promise.all([
       db.select().from(joinRequests).orderBy(desc(joinRequests.requestedAt)),
       db.select({ id: admins.id, name: admins.name, email: admins.email, receiveReportEmails: admins.receiveReportEmails }).from(admins),
@@ -60,6 +66,12 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
+    const currentAdmin = await resolveCurrentAdmin(request)
+
+    if (!currentAdmin || currentAdmin.isActive !== true) {
+      return NextResponse.json({ success: false, message: '관리자 인증이 필요합니다.' }, { status: 401 })
+    }
+
     const body = await request.json().catch(() => null)
 
     if (!body || typeof body !== 'object') {
@@ -67,12 +79,6 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (typeof body.notifyUpdates === 'boolean') {
-      const currentAdmin = await resolveCurrentAdmin(request)
-
-      if (!currentAdmin) {
-        return NextResponse.json({ success: false, message: '관리자 계정을 찾지 못했습니다.' }, { status: 404 })
-      }
-
       await db.update(admins)
         .set({ receiveReportEmails: body.notifyUpdates })
         .where(eq(admins.id, currentAdmin.id))

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
+import { auth } from '@/lib/auth/server'
 import { db } from '@/lib/db'
 import { admins, joinRequests } from '@/lib/schema'
-import { hashPassword } from '@/lib/password'
 import { getPasswordPolicyError } from '@/lib/password-policy'
 
 const INVITE_VALID_HOURS = 72
@@ -58,9 +58,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: '초대 링크가 만료되었습니다. 다시 승인 요청을 받아주세요.' }, { status: 400 })
     }
 
-    const passwordHash = hashPassword(password)
     const fallbackName = target.email.split('@')[0] || 'New Admin'
     const safeName = requestedName || fallbackName
+
+    const authResult = await auth.signUp.email({
+      email: target.email,
+      name: safeName,
+      password,
+    })
+
+    if (authResult.error) {
+      return NextResponse.json({ success: false, message: 'Neon Auth 계정 생성에 실패했습니다.' }, { status: 400 })
+    }
 
     const existingAdmin = await db.select().from(admins).where(eq(admins.email, target.email)).limit(1)
 
@@ -68,7 +77,6 @@ export async function POST(request: Request) {
       await db
         .update(admins)
         .set({
-          passwordHash,
           isActive: true,
           name: existingAdmin[0].name || safeName,
           updatedAt: new Date(),
@@ -78,7 +86,6 @@ export async function POST(request: Request) {
       await db.insert(admins).values({
         name: safeName,
         email: target.email,
-        passwordHash,
         isActive: true,
         receiveReportEmails: true,
       })

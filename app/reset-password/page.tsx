@@ -112,15 +112,17 @@ function ResetPasswordContent() {
 
     try {
       const endpoint = token ? '/api/auth/reset-password' : '/api/auth/request-password-reset'
-      const body = token ? { token, password } : { email }
+      const body = token
+        ? { token, newPassword: password }
+        : { email, redirectTo: `${window.location.origin}/reset-password` }
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const payload = (await response.json()) as { success?: boolean; code?: string; message?: string }
+      const payload = (await response.json()) as { success?: boolean; code?: string; message?: string; error?: unknown }
 
-      if (!response.ok || !payload.success) {
+      if (!response.ok || payload.error || payload.success === false) {
         setErrorMessage(payload.code === 'passwordPolicy'
           ? copy.passwordPolicy
           : localizeResetError(payload.message, language, copy.networkError))

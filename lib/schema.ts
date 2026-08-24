@@ -20,7 +20,6 @@ export const admins = pgTable('admins', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 100 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
   receiveReportEmails: boolean('receive_report_emails').default(true),
   isActive: boolean('is_active').default(true),
   invitedBy: uuid('invited_by').references((): AnyPgColumn => admins.id),
