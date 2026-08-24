@@ -3,5 +3,5 @@ import { auth } from '@/lib/auth/server'
 export default auth.middleware({ loginUrl: '/login' })
 
 export const config = {
-  matcher: ['/((?!api|_next|login|.*\\.[^/]+$).*)'],
+  matcher: ['/((?!api|_next|login|chat|reset-password|activate|.*\\.[^/]+$).*)'],
 }

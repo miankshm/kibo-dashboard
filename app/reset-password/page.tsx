@@ -17,6 +17,7 @@ const resetPasswordCopy = {
     languageButton: 'English',
     title: '비밀번호 재설정',
     description: '가입한 이메일 주소로 비밀번호 재설정 링크를 보내드립니다.',
+    resetDescription: '새 비밀번호를 입력해 계정을 안전하게 보호하세요.',
     emailLabel: '이메일',
     emailPlaceholder: '이메일을 입력하세요',
     submitButton: '재설정 링크 보내기',
@@ -30,6 +31,7 @@ const resetPasswordCopy = {
     resetButton: '비밀번호 변경하기',
     resettingButton: '변경 중...',
     resetSuccess: '비밀번호가 변경되었습니다. 로그인 페이지로 이동합니다.',
+    resetFailed: '비밀번호를 변경하지 못했습니다. 새 비밀번호를 확인한 후 다시 시도해 주세요.',
     invalidLink: '재설정 링크가 만료되었거나 올바르지 않습니다.',
     passwordMismatch: '비밀번호 확인이 일치하지 않습니다.',
     networkError: '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
@@ -39,6 +41,7 @@ const resetPasswordCopy = {
     languageButton: '한국어',
     title: 'Reset Password',
     description: 'We will send a password reset link to the email address you used to register.',
+    resetDescription: 'Enter a new password to secure your account.',
     emailLabel: 'Email',
     emailPlaceholder: 'Enter your email',
     submitButton: 'Send reset link',
@@ -52,6 +55,7 @@ const resetPasswordCopy = {
     resetButton: 'Change password',
     resettingButton: 'Changing...',
     resetSuccess: 'Your password has been changed. Redirecting to sign in.',
+    resetFailed: 'We could not change your password. Check your new password and try again.',
     invalidLink: 'This reset link is expired or invalid.',
     passwordMismatch: 'The passwords do not match.',
     networkError: 'A network error occurred. Please try again shortly.',
@@ -125,7 +129,9 @@ function ResetPasswordContent() {
       if (!response.ok || payload.error || payload.success === false) {
         setErrorMessage(payload.code === 'passwordPolicy'
           ? copy.passwordPolicy
-          : localizeResetError(payload.message, language, copy.networkError))
+          : token
+            ? copy.resetFailed
+            : localizeResetError(payload.message, language, copy.networkError))
         return
       }
 
@@ -161,7 +167,7 @@ function ResetPasswordContent() {
             <Mail className="h-6 w-6" />
           </div>
           <CardTitle className="text-2xl">{token ? copy.resetButton : copy.title}</CardTitle>
-          <CardDescription>{copy.description}</CardDescription>
+          <CardDescription>{token ? copy.resetDescription : copy.description}</CardDescription>
         </CardHeader>
 
         <CardContent>
