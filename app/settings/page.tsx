@@ -20,6 +20,7 @@ type JoinRequest = {
   email: string
   requestedAt: string | null
   status: RequestStatus | 'activated'
+  emailSent: boolean
 }
 
 type AdminUser = {
@@ -266,9 +267,9 @@ export default function SettingsPage() {
                             {request.status === 'approved' ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}
                             {request.status === 'approved' ? text.settings.approved : request.status === 'activated' ? text.settings.activated : text.settings.pending}
                           </Badge>
-                          {request.status === 'pending' ? (
+                          {request.status === 'pending' || (request.status === 'approved' && !request.emailSent) ? (
                             <Button size="sm" onClick={() => void handleApprove(request.id)} className="rounded-full" disabled={approvingId === request.id}>
-                              {approvingId === request.id ? '승인 처리중...' : text.settings.approve}
+                              {approvingId === request.id ? '처리중...' : request.status === 'approved' ? '메일 재발송' : text.settings.approve}
                             </Button>
                           ) : (
                             <Button size="sm" variant="outline" disabled className="rounded-full">

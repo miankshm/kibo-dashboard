@@ -3,11 +3,10 @@ import { db } from '@/lib/db'
 import { admins, joinRequests } from '@/lib/schema'
 import { sendEmail } from '@/lib/email'
 import { eq, desc, inArray, notInArray } from 'drizzle-orm'
-import { AUTH_COOKIE_NAME, verifySessionToken } from '@/lib/auth'
+import { AUTH_IDENTITY_COOKIE_NAME } from '@/lib/auth'
 
 async function resolveCurrentAdmin(request: NextRequest) {
-  const session = verifySessionToken(request.cookies.get(AUTH_COOKIE_NAME)?.value)
-  const identity = session?.identity?.trim().toLowerCase()
+  const identity = request.cookies.get(AUTH_IDENTITY_COOKIE_NAME)?.value?.trim().toLowerCase()
 
   if (identity) {
     const matched = await db!.select().from(admins).where(eq(admins.email, identity)).limit(1)
@@ -40,6 +39,7 @@ export async function GET(request: NextRequest) {
         id: request.id,
         email: request.email,
         status: request.status,
+        emailSent: request.inviteSentAt !== null,
         requestedAt: request.requestedAt?.toISOString() ?? null,
       })),
       adminList: adminRows.map((a) => ({
@@ -117,19 +117,26 @@ export async function PATCH(request: NextRequest) {
       }
 
       if (target.status === 'approved') {
+        if (target.inviteSentAt === null) {
+          // Allow retrying delivery when approval succeeded but SMTP failed.
+        } else {
+          return NextResponse.json({
+            success: true,
+            status: 'approved',
+            emailSent: true,
+            message: '이미 승인된 요청입니다.',
+          })
+        }
+      }
+
+      if (target.status !== 'pending' && target.status !== 'approved') {
         return NextResponse.json({
-          success: true,
-          status: 'approved',
-          emailSent: target.inviteSentAt !== null,
-          message: '이미 승인된 요청입니다.',
-        })
+          success: false,
+          message: '처리할 수 없는 요청 상태입니다.',
+        }, { status: 400 })
       }
 
-      if (target.status !== 'pending') {
-        return NextResponse.json({ success: false, message: '처리할 수 없는 요청 상태입니다.' }, { status: 400 })
-      }
-
-      const inviteToken = crypto.randomUUID().replace(/-/g, '')
+      const inviteToken = target.inviteToken ?? crypto.randomUUID().replace(/-/g, '')
       const origin = new URL(request.url).origin
       const setupPath = `/activate?token=${encodeURIComponent(inviteToken)}`
       const setupUrl = `${process.env.APP_BASE_URL ?? origin}${setupPath}`
@@ -144,7 +151,7 @@ export async function PATCH(request: NextRequest) {
 
       const emailResult = await sendEmail({
         to: target.email,
-        subject: '[Kibo Dashboard] Your access request has been approved / 가입 요청이 승인되었습니다',
+        subject: '[Kibo Dashboard] Your access request has been approved / 가입 요청 승인 안내',
         html: `
           <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
             <h2 style="margin-bottom: 8px;">Your Kibo Dashboard access request has been approved</h2>
@@ -156,13 +163,11 @@ export async function PATCH(request: NextRequest) {
             </p>
             <p>If the link does not open, copy and paste the address below into your browser.</p>
             <p style="word-break: break-all;">${setupUrl}</p>
-
             <hr style="margin: 28px 0; border: 0; border-top: 1px solid #e5e7eb;" />
-
-            <h2 style="margin-bottom: 8px;">가입 요청 승인 안내</h2>
+            <h2 style="margin-bottom: 8px;">Kibo Dashboard 가입 요청이 승인되었습니다</h2>
             <p>안녕하세요.</p>
             <p>요청하신 Kibo Dashboard 가입이 승인되었습니다.</p>
-            <p>아래 링크에서 비밀번호를 설정해 계정을 활성화해주세요.</p>
+            <p>아래 링크에서 비밀번호를 설정하고 계정을 활성화해주세요.</p>
             <p style="margin: 20px 0;">
               <a href="${setupUrl}" style="display: inline-block; padding: 10px 14px; border-radius: 8px; text-decoration: none; background: #2563eb; color: #ffffff;">비밀번호 설정하기</a>
             </p>
@@ -170,7 +175,7 @@ export async function PATCH(request: NextRequest) {
             <p style="word-break: break-all;">${setupUrl}</p>
           </div>
         `,
-        text: `Your Kibo Dashboard access request has been approved.\n\nUse the link below to create your password and activate your account.\nCreate your password: ${setupUrl}\n\n가입 요청이 승인되었습니다.\n\n아래 링크에서 비밀번호를 설정해 계정을 활성화해주세요.\n비밀번호 설정하기: ${setupUrl}`,
+        text: `Your Kibo Dashboard access request has been approved. Create your password and activate your account: ${setupUrl}\n\nKibo Dashboard 가입 요청이 승인되었습니다. 아래 링크에서 비밀번호를 설정하고 계정을 활성화해주세요: ${setupUrl}`,
       })
 
       if (!emailResult.ok) {

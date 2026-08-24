@@ -1,41 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { AUTH_COOKIE_NAME, isAuthenticatedCookie } from '@/lib/auth'
-// isAuthenticatedCookie verifies the HMAC signature and expiry of the session token
+import { auth } from '@/lib/auth/server'
 
-const PUBLIC_PATHS = new Set(['/login', '/chat', '/reset-password'])
-
-function isPublicFile(pathname: string): boolean {
-  return /\.[^/]+$/.test(pathname)
-}
-
-export function proxy(request: NextRequest) {
-  const { pathname, search } = request.nextUrl
-
-  if (pathname.startsWith('/_next') || pathname.startsWith('/api') || isPublicFile(pathname)) {
-    return NextResponse.next()
-  }
-
-  const isLoggedIn = isAuthenticatedCookie(request.cookies.get(AUTH_COOKIE_NAME)?.value)
-
-  if (PUBLIC_PATHS.has(pathname)) {
-    if (isLoggedIn) {
-      return NextResponse.redirect(new URL('/', request.url))
-    }
-
-    return NextResponse.next()
-  }
-
-  if (!isLoggedIn) {
-    const loginUrl = new URL('/login', request.url)
-    const fullPath = `${pathname}${search}`
-    loginUrl.searchParams.set('next', fullPath)
-
-    return NextResponse.redirect(loginUrl)
-  }
-
-  return NextResponse.next()
-}
+export default auth.middleware({ loginUrl: '/login' })
 
 export const config = {
-  matcher: '/:path*',
+  matcher: ['/((?!api|_next|login|.*\\.[^/]+$).*)'],
 }

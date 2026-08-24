@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { AUTH_COOKIE_NAME, SESSION_MAX_AGE_SECONDS, createSessionToken } from '@/lib/auth'
+import { auth } from '@/lib/auth/server'
 import { db } from '@/lib/db'
 import { admins } from '@/lib/schema'
 import { verifyPassword } from '@/lib/password'
@@ -29,9 +29,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const username = body.username.trim()
-  const password = body.password
-  const normalizedUsername = username.toLowerCase()
+  const email = body.username.trim().toLowerCase()
   const rateLimit = await checkLoginRateLimit(getClientIp(request))
 
   if (!rateLimit.success) {
@@ -49,48 +47,48 @@ export async function POST(request: Request) {
     )
   }
 
-  let isAuthenticated = false
-  let loginIdentity = normalizedUsername
+  const { error } = await auth.signIn.email({
+    email,
+    password: body.password,
+  })
 
+  if (!error) {
+    return NextResponse.json({ success: true })
+  }
+
+  // Migrate accounts created before Neon Auth was enabled on their first login.
   if (db) {
-    const foundAdmins = await db
+    const legacyAdmins = await db
       .select()
       .from(admins)
-      .where(and(eq(admins.email, username.toLowerCase()), eq(admins.isActive, true)))
+      .where(and(eq(admins.email, email), eq(admins.isActive, true)))
       .limit(1)
 
-    if (foundAdmins.length > 0) {
-      isAuthenticated = verifyPassword(password, foundAdmins[0].passwordHash)
+    const legacyAdmin = legacyAdmins[0]
 
-      if (isAuthenticated) {
-        loginIdentity = foundAdmins[0].email
+    if (legacyAdmin && verifyPassword(body.password, legacyAdmin.passwordHash)) {
+      const migration = await auth.signUp.email({
+        email: legacyAdmin.email,
+        name: legacyAdmin.name,
+        password: body.password,
+      })
+
+      if (!migration.error) {
         await db
           .update(admins)
           .set({ lastLoginAt: new Date(), updatedAt: new Date() })
-          .where(eq(admins.id, foundAdmins[0].id))
+          .where(eq(admins.id, legacyAdmin.id))
+
+        return NextResponse.json({ success: true })
       }
     }
   }
 
-  if (!isAuthenticated) {
-    return NextResponse.json(
-      {
-        success: false,
-        message: '아이디 또는 비밀번호가 일치하지 않습니다.',
-      },
-      { status: 401 },
-    )
-  }
-
-  const response = NextResponse.json({ success: true })
-
-  response.cookies.set(AUTH_COOKIE_NAME, createSessionToken(loginIdentity), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: SESSION_MAX_AGE_SECONDS,
-  })
-
-  return response
+  return NextResponse.json(
+    {
+      success: false,
+      message: '아이디 또는 비밀번호가 일치하지 않습니다.',
+    },
+    { status: 401 },
+  )
 }
