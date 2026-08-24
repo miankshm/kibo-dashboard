@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -10,15 +11,31 @@ import { Label } from '@/components/ui/label'
 const REMEMBERED_USERNAME_KEY = 'kibo_remembered_username'
 
 type LoginFormText = {
+  isEnglish: boolean
   usernameLabel: string
   usernamePlaceholder: string
   passwordLabel: string
   passwordPlaceholder: string
   rememberLabel: string
+  forgotPasswordLabel: string
   loginButton: string
   loggingInButton: string
   loginFailed: string
   networkError: string
+}
+
+function localizeLoginError(message: string | undefined, text: LoginFormText): string {
+  if (!message || !text.isEnglish) {
+    return message ?? text.loginFailed
+  }
+
+  const translations: Record<string, string> = {
+    '아이디 또는 비밀번호 형식이 올바르지 않습니다.': 'Please enter a valid email and password.',
+    '아이디 또는 비밀번호가 일치하지 않습니다.': 'The email or password is incorrect.',
+    '로그인에 실패했습니다.': text.loginFailed,
+  }
+
+  return translations[message] ?? message
 }
 
 type LoginFormProps = {
@@ -65,7 +82,7 @@ export function LoginForm({ nextPath, text }: LoginFormProps) {
       const payload = (await response.json()) as { success: boolean; message?: string }
 
       if (!response.ok || !payload.success) {
-        setErrorMessage(payload.message ?? text.loginFailed)
+        setErrorMessage(localizeLoginError(payload.message, text))
         setIsSubmitting(false)
         return
       }
@@ -91,6 +108,7 @@ export function LoginForm({ nextPath, text }: LoginFormProps) {
         <Input
           id="username"
           name="username"
+          type="email"
           autoComplete="username"
           value={username}
           onChange={(event) => setUsername(event.target.value)}
@@ -126,7 +144,7 @@ export function LoginForm({ nextPath, text }: LoginFormProps) {
       </label>
 
       {errorMessage ? (
-        <p className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p className="text-sm text-destructive">
           {errorMessage}
         </p>
       ) : null}
@@ -141,6 +159,12 @@ export function LoginForm({ nextPath, text }: LoginFormProps) {
           text.loginButton
         )}
       </Button>
+
+      <div className="text-left">
+        <Link href="/reset-password" className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+          {text.forgotPasswordLabel}
+        </Link>
+      </div>
     </form>
   )
 }

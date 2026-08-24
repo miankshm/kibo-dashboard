@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { getPasswordPolicyError } from '@/lib/password-policy'
 
 type ActivateAccountFormProps = {
   token: string
@@ -36,8 +37,8 @@ export function ActivateAccountForm({ token, language = 'en', onToggleLanguage }
       return
     }
 
-    if (password.length < 8) {
-      setErrorMessage(copy.passwordTooShort)
+    if (getPasswordPolicyError(password)) {
+      setErrorMessage(copy.passwordPolicy)
       return
     }
 
@@ -130,6 +131,7 @@ export function ActivateAccountForm({ token, language = 'en', onToggleLanguage }
           id="activate-password"
           type="password"
           autoComplete="new-password"
+          minLength={12}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           placeholder={copy.passwordPlaceholder}
@@ -143,6 +145,7 @@ export function ActivateAccountForm({ token, language = 'en', onToggleLanguage }
           id="activate-password-confirm"
           type="password"
           autoComplete="new-password"
+          minLength={12}
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
           placeholder={copy.confirmPasswordPlaceholder}
@@ -151,7 +154,7 @@ export function ActivateAccountForm({ token, language = 'en', onToggleLanguage }
       </div>
 
       {errorMessage ? (
-        <p className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p className="text-sm text-destructive">
           {errorMessage}
         </p>
       ) : null}
@@ -179,6 +182,7 @@ const activateCopy = {
     namePlaceholder: '예: Kibo Admin',
     passwordLabel: '비밀번호',
     passwordPlaceholder: '8자 이상 입력하세요',
+    passwordPolicy: '비밀번호는 12자 이상이며 대문자, 소문자, 숫자, 특수문자를 각각 하나 이상 포함해야 합니다.',
     confirmPasswordLabel: '비밀번호 확인',
     confirmPasswordPlaceholder: '비밀번호를 다시 입력하세요',
     passwordTooShort: '비밀번호는 8자 이상이어야 합니다.',
@@ -197,6 +201,7 @@ const activateCopy = {
     namePlaceholder: 'e.g. Kibo Admin',
     passwordLabel: 'Password',
     passwordPlaceholder: 'Enter at least 8 characters',
+    passwordPolicy: 'Your password must be at least 12 characters long and include at least one uppercase letter, one lowercase letter, one number, and one special character.',
     confirmPasswordLabel: 'Confirm password',
     confirmPasswordPlaceholder: 'Enter your password again',
     passwordTooShort: 'Your password must be at least 8 characters.',

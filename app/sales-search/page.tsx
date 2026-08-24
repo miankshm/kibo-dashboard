@@ -34,6 +34,8 @@ import type { SaleRecord, SalesMode } from '@/lib/types'
 
 type SearchStore = StoreId
 
+const SALES_DATA_START_DATE = new Date(2021, 0, 1)
+
 function formatCurrency(value: number) {
   return `$${value.toLocaleString('en-US', {
     minimumFractionDigits: 2,
@@ -148,7 +150,15 @@ export default function SalesSearchPage() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus />
+                        <Calendar
+                          mode="single"
+                          selected={startDate}
+                          onSelect={setStartDate}
+                          captionLayout="dropdown"
+                          startMonth={SALES_DATA_START_DATE}
+                          className="[&_.rdp-dropdowns]:flex-row-reverse"
+                          initialFocus
+                        />
                       </PopoverContent>
                     </Popover>
                   </div>
@@ -163,7 +173,14 @@ export default function SalesSearchPage() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus />
+                        <Calendar
+                          mode="single"
+                          selected={endDate}
+                          onSelect={setEndDate}
+                          captionLayout="dropdown"
+                          className="[&_.rdp-dropdowns]:flex-row-reverse"
+                          initialFocus
+                        />
                       </PopoverContent>
                     </Popover>
                   </div>
