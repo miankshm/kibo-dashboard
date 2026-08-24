@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { FormEvent, Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Loader2, Mail } from 'lucide-react'
@@ -76,7 +76,7 @@ function localizeResetError(message: string | undefined, language: ResetPassword
   return translations[message] ?? message
 }
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const [language, setLanguage] = useState<ResetPasswordLanguage>('ko')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -234,5 +234,13 @@ export default function ResetPasswordPage() {
         </CardContent>
       </Card>
     </main>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordContent />
+    </Suspense>
   )
 }
