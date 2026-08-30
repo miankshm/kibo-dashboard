@@ -73,6 +73,7 @@ export function LoginForm({ nextPath, text }: LoginFormProps) {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
+        cache: 'no-store',
         headers: {
           'Content-Type': 'application/json',
         },

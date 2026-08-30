@@ -75,5 +75,8 @@ export async function POST(request: Request) {
     .set({ lastLoginAt: new Date(), updatedAt: new Date() })
     .where(eq(admins.id, admin.id))
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json(
+    { success: true },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
 }
