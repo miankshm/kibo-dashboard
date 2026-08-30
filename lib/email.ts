@@ -5,6 +5,11 @@ type SendEmailInput = {
   subject: string
   html: string
   text?: string
+  attachments?: Array<{
+    filename: string
+    content: Buffer
+    contentType: string
+  }>
 }
 
 type SendEmailResult = {
@@ -50,6 +55,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       subject: input.subject,
       html: input.html,
       text: input.text,
+      attachments: input.attachments,
     })
 
     return { ok: true }
