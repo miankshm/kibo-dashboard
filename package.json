@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
@@ -78,7 +79,9 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.2.0",
+    "@playwright/test": "^1.57.0",
     "@types/node": "^22",
     "@types/nodemailer": "^8.0.1",
     "@types/papaparse": "^5.5.2",

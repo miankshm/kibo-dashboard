@@ -24,6 +24,16 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Playwright dashboard check
+
+Run the dashboard smoke test with:
+
+```bash
+pnpm test:e2e
+```
+
+On the first run, Chromium opens the admin login page. Complete the login manually; Playwright saves the authenticated session in `.auth/user.json`. The `auth.spec.ts` setup test runs before `dashboard.spec.ts`. Subsequent runs reuse that session and verify that the dashboard contains the `매출 요약` section. When the application session expires, Chromium opens again for login.
+
 ## Login rate limiting
 
 Login requests use Upstash Redis to limit each client IP to 30 requests per 15 minutes. Set these environment variables in the deployment environment:
