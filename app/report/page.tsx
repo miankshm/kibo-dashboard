@@ -96,14 +96,14 @@ export default function ReportPage() {
     const node = reportRef.current
     if (!node || !report) throw new Error('Report is not ready.')
 
-    const [{ toPng }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')])
+    const [{ toJpeg }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')])
     let image: string
     try {
-      image = await toPng(node, { backgroundColor: '#ffffff', cacheBust: true, pixelRatio: 2 })
+      image = await toJpeg(node, { backgroundColor: '#ffffff', cacheBust: true, pixelRatio: 2, quality: 0.82 })
     } catch {
       const { default: html2canvas } = await import('html2canvas')
       const canvas = await html2canvas(node, { backgroundColor: '#ffffff', scale: 2 })
-      image = canvas.toDataURL('image/png')
+      image = canvas.toDataURL('image/jpeg', 0.82)
     }
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const imageProperties = pdf.getImageProperties(image)
@@ -112,11 +112,11 @@ export default function ReportPage() {
     const imageHeight = (imageProperties.height * pageWidth) / imageProperties.width
     let position = 0
 
-    pdf.addImage(image, 'PNG', 0, position, pageWidth, imageHeight)
+    pdf.addImage(image, 'JPEG', 0, position, pageWidth, imageHeight)
     for (let remaining = imageHeight - pageHeight; remaining > 0; remaining -= pageHeight) {
       position -= pageHeight
       pdf.addPage()
-      pdf.addImage(image, 'PNG', 0, position, pageWidth, imageHeight)
+      pdf.addImage(image, 'JPEG', 0, position, pageWidth, imageHeight)
     }
 
     return pdf.output('blob')
