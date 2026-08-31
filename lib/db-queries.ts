@@ -7,6 +7,7 @@ import type {
   CashAnalysisData,
   CashAnalysisDetail,
   CashAnalysisWindow,
+  DateRangeReportData,
   DailySalesInput,
   DashboardSummaryData,
   DashboardTrendData,
@@ -537,6 +538,108 @@ export async function getCashAnalysisFromDb(params: {
   return {
     anchorDate: toDateKey(anchorDate),
     windows,
+  }
+}
+
+export async function getDateRangeReportFromDb(params: {
+  storeKey: StoreKey
+  startDate: string
+  endDate: string
+}): Promise<DateRangeReportData> {
+  const start = startOfDay(new Date(`${params.startDate}T00:00:00`))
+  const end = startOfDay(new Date(`${params.endDate}T00:00:00`))
+  const periodDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1)
+  const previousEnd = addDays(start, -1)
+  const previousStart = addDays(previousEnd, -(periodDays - 1))
+  const [totals, previousTotals] = await Promise.all([
+    getTotals(params.storeKey, params.startDate, params.endDate),
+    getTotals(params.storeKey, toDateKey(previousStart), toDateKey(previousEnd)),
+  ])
+  const dailyRows = await getDailyAggregates(params.storeKey, params.startDate, params.endDate)
+  const [channels] = await db
+    .select({
+      cardSales: sql<number>`coalesce(sum(${salesRecordsNew.cardWithoutTips}), 0)`,
+      cashSales: sql<number>`coalesce(sum(${salesRecordsNew.cashSaleInclGross}), 0)`,
+      uberEatsSales: sql<number>`coalesce(sum(${salesRecordsNew.ubereats}), 0)`,
+      doorDashSales: sql<number>`coalesce(sum(${salesRecordsNew.doordash}), 0)`,
+      cashAndCarrySales: sql<number>`coalesce(sum(${salesRecordsNew.cashAndCarry}), 0)`,
+      tips: sql<number>`coalesce(sum(${salesRecordsNew.paidOut}), 0)`,
+    })
+    .from(salesRecordsNew)
+    .innerJoin(stores, eq(salesRecordsNew.storeId, stores.id))
+    .where(and(
+      gte(salesRecordsNew.saleDate, params.startDate),
+      lte(salesRecordsNew.saleDate, params.endDate),
+      ...(params.storeKey === 'all' ? [] : [eq(stores.key, params.storeKey)]),
+    ))
+
+  const toPeriodRow = (label: string, rows: typeof dailyRows) => ({
+    label,
+    startDate: rows[0]?.salesDate ?? params.startDate,
+    endDate: rows[rows.length - 1]?.salesDate ?? params.endDate,
+    totalSales: rows.reduce((sum, row) => sum + row.totalSales, 0),
+    netSales: rows.reduce((sum, row) => sum + row.netSales, 0),
+    expectedCash: rows.reduce((sum, row) => sum + row.expectedCash, 0),
+    actualCash: rows.reduce((sum, row) => sum + row.actualCash, 0),
+    cashDifference: rows.reduce((sum, row) => sum + row.difference, 0),
+  })
+  const groupedRows = (keyFor: (date: string) => string) => {
+    const groups = new Map<string, typeof dailyRows>()
+    for (const row of dailyRows) {
+      const key = keyFor(row.salesDate)
+      groups.set(key, [...(groups.get(key) ?? []), row])
+    }
+    return Array.from(groups, ([label, rows]) => toPeriodRow(label, rows))
+  }
+  const weekly = groupedRows((date) => {
+    const value = new Date(`${date}T00:00:00`)
+    const dayOffset = (value.getDay() + 6) % 7
+    return toDateKey(addDays(value, -dayOffset))
+  })
+  const monthly = groupedRows((date) => date.slice(0, 7))
+
+  const periodEvents = await db
+    .select({ eventMasterId: events.eventMasterId, name: eventMasters.name, eventDate: events.eventDate, year: events.year })
+    .from(events)
+    .innerJoin(eventMasters, eq(events.eventMasterId, eventMasters.id))
+    .where(and(gte(events.eventDate, params.startDate), lte(events.eventDate, params.endDate)))
+    .orderBy(asc(events.eventDate))
+  const masterIds = periodEvents.flatMap((event) => event.eventMasterId ? [event.eventMasterId] : [])
+  const historicalEvents = masterIds.length > 0
+    ? await db.select({ eventMasterId: events.eventMasterId, eventDate: events.eventDate, year: events.year }).from(events).where(inArray(events.eventMasterId, masterIds))
+    : []
+  const neededDates = Array.from(new Set(historicalEvents.map((event) => event.eventDate)))
+  const holidaySales = neededDates.length > 0
+    ? await db.select({ date: salesRecordsNew.saleDate, sales: sql<number>`coalesce(sum(${salesRecordsNew.totalSale}), 0)` }).from(salesRecordsNew).innerJoin(stores, eq(salesRecordsNew.storeId, stores.id)).where(and(inArray(salesRecordsNew.saleDate, neededDates), ...(params.storeKey === 'all' ? [] : [eq(stores.key, params.storeKey)]))).groupBy(salesRecordsNew.saleDate)
+    : []
+  const salesByDate = new Map(holidaySales.map((row) => [row.date, asNumber(row.sales)]))
+  const holidays = periodEvents.map((event) => {
+    const previous = historicalEvents.find((item) => item.eventMasterId === event.eventMasterId && item.year === event.year - 1)
+    const sales = salesByDate.get(event.eventDate) ?? 0
+    const previousYearSales = previous ? salesByDate.get(previous.eventDate) ?? 0 : null
+    return {
+      name: event.name,
+      date: event.eventDate,
+      sales,
+      previousYearSales,
+      yearOverYear: previousYearSales && previousYearSales !== 0 ? Number((((sales - previousYearSales) / previousYearSales) * 100).toFixed(1)) : null,
+    }
+  })
+
+  return {
+    storeKey: params.storeKey,
+    startDate: params.startDate,
+    endDate: params.endDate,
+    totals: { label: 'Selected period', startDate: params.startDate, endDate: params.endDate, ...totals, cashDifference: totals.actualCash - totals.expectedCash },
+    previousTotals: { label: 'Previous period', startDate: toDateKey(previousStart), endDate: toDateKey(previousEnd), ...previousTotals, cashDifference: previousTotals.actualCash - previousTotals.expectedCash },
+    growthRate: previousTotals.totalSales === 0 ? null : Number((((totals.totalSales - previousTotals.totalSales) / previousTotals.totalSales) * 100).toFixed(1)),
+    channels: {
+      cardSales: asNumber(channels?.cardSales), cashSales: asNumber(channels?.cashSales), uberEatsSales: asNumber(channels?.uberEatsSales), doorDashSales: asNumber(channels?.doorDashSales), cashAndCarrySales: asNumber(channels?.cashAndCarrySales), tips: asNumber(channels?.tips),
+    },
+    daily: dailyRows.map((row) => ({ label: row.salesDate, startDate: row.salesDate, endDate: row.salesDate, ...row, cashDifference: row.difference })),
+    weekly,
+    monthly,
+    holidays,
   }
 }
 

@@ -86,6 +86,44 @@ export interface CashAnalysisData {
   windows: CashAnalysisWindow[]
 }
 
+export interface PeriodReportRow {
+  label: string
+  startDate: string
+  endDate: string
+  totalSales: number
+  netSales: number
+  expectedCash: number
+  actualCash: number
+  cashDifference: number
+}
+
+export interface DateRangeReportData {
+  storeKey: StoreKey
+  startDate: string
+  endDate: string
+  totals: PeriodReportRow
+  previousTotals: PeriodReportRow
+  growthRate: number | null
+  channels: {
+    cardSales: number
+    cashSales: number
+    uberEatsSales: number
+    doorDashSales: number
+    cashAndCarrySales: number
+    tips: number
+  }
+  daily: PeriodReportRow[]
+  weekly: PeriodReportRow[]
+  monthly: PeriodReportRow[]
+  holidays: Array<{
+    name: string
+    date: string
+    sales: number
+    previousYearSales: number | null
+    yearOverYear: number | null
+  }>
+}
+
 export interface HolidayListItem {
   id: string
   name: string
