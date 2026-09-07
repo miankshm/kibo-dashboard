@@ -20,7 +20,7 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: '**/auth.spec.ts',
-      use: { ...devices['Desktop Chrome'], headless: false },
+      use: { ...devices['Desktop Chrome'], headless: true },
     },
     {
       name: 'chromium',
